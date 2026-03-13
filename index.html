@@ -35,16 +35,6 @@
           <div class="context-status" id="context-status"></div>
         </div>
       </div>
-      <div class="header-right">
-        <button id="btn-apply-all" class="btn btn-success">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          kubectl apply
-        </button>
-        <button id="btn-download-all" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l3-3m-3 3L5 7M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Download All
-        </button>
-      </div>
     </header>
 
     <div class="app-body">
@@ -62,6 +52,16 @@
 
       <!-- Page: YAML Generator -->
       <div class="page active" id="page-yaml-generator">
+    <div class="yaml-toolbar">
+      <button id="btn-apply-all" class="btn btn-success">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        kubectl apply
+      </button>
+      <button id="btn-download-all" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l3-3m-3 3L5 7M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download All
+      </button>
+    </div>
     <!-- Main Content -->
     <main class="main">
       <!-- Left: Form Panel -->
@@ -90,16 +90,11 @@
             </div>
             <div class="form-group">
               <label for="namespace">Namespace</label>
-              <input type="text" id="namespace" placeholder="default" value="default" />
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Create Namespace</label>
-                <label class="toggle">
-                  <input type="checkbox" id="create-namespace" />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
+              <select id="namespace">
+                <option value="">-- Chọn Namespace --</option>
+                <option value="__create__">+ Tạo Namespace mới</option>
+              </select>
+              <input type="text" id="namespace-new" placeholder="Nhập tên namespace mới" style="display:none;margin-top:6px;" />
             </div>
             <div class="form-group">
               <label for="labels">Custom Labels</label>
@@ -663,14 +658,6 @@
             <button class="btn btn-primary" id="sa-btn-export">📤 Export Kubeconfig</button>
           </div>
 
-          <!-- Log Output -->
-          <div class="sa-log" id="sa-log">
-            <div class="sa-log-header">
-              <span>📋 Output</span>
-              <button class="btn btn-ghost btn-sm" id="sa-btn-clear-log">Clear</button>
-            </div>
-            <pre class="sa-log-content" id="sa-log-content">Ready...</pre>
-          </div>
         </div>
       </div><!-- /page-sa-manager -->
 

@@ -83,33 +83,29 @@ function saConfirm(message) {
   });
 }
 
-// ===== Log Helper =====
-function saLog(msg, type = 'info') {
-  const log = document.getElementById('sa-log-content');
-  const ts = new Date().toLocaleTimeString();
-  const prefix = type === 'error' ? '✗' : type === 'success' ? '✓' : '→';
-  log.textContent += `\n[${ts}] ${prefix} ${msg}`;
-  log.scrollTop = log.scrollHeight;
+// ===== Toast Helper (reuse from main app) =====
+function showSAToast(msg, type = 'info') {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.className = 'toast show ' + type;
+  setTimeout(() => toast.className = 'toast', 3000);
 }
 
 // ===== Run kubectl via Tauri =====
 async function kubectl(args, stdinInput = null) {
   if (!saInvoke) {
-    saLog('kubectl chỉ khả dụng trong Tauri desktop app', 'error');
+    showSAToast('kubectl chỉ khả dụng trong Tauri desktop app', 'error');
     return null;
   }
-  saLog(`kubectl ${args.join(' ')}`);
   try {
     const result = await saInvoke('run_kubectl', { args, stdinInput });
-    if (result.success) {
-      if (result.stdout.trim()) saLog(result.stdout.trim(), 'success');
-      return result;
-    } else {
-      saLog(result.stderr || 'Command failed', 'error');
-      return result;
+    if (!result.success) {
+      showSAToast(result.stderr || 'Command failed', 'error');
     }
+    return result;
   } catch (e) {
-    saLog(`Error: ${e}`, 'error');
+    showSAToast(`Error: ${e}`, 'error');
     return null;
   }
 }
@@ -197,11 +193,6 @@ function initSAButtons() {
     document.getElementById('sa-update-ns-list').appendChild(createNsBindingRow());
   });
 
-  // Clear log
-  document.getElementById('sa-btn-clear-log')?.addEventListener('click', () => {
-    document.getElementById('sa-log-content').textContent = 'Ready...';
-  });
-
   // Namespace dropdown → load SAs
   document.getElementById('sa-delete-ns')?.addEventListener('change', (e) => {
     loadServiceAccounts(e.target.value, 'sa-delete-name');
@@ -217,10 +208,10 @@ function initSAButtons() {
   document.getElementById('sa-btn-create')?.addEventListener('click', async () => {
     const sa = document.getElementById('sa-create-name').value.trim();
     const ns = document.getElementById('sa-create-ns').value;
-    if (!sa) { saLog('Vui lòng nhập SA name', 'error'); return; }
-    if (!ns) { saLog('Vui lòng chọn Namespace', 'error'); return; }
+    if (!sa) { showSAToast('Vui lòng nhập SA name', 'error'); return; }
+    if (!ns) { showSAToast('Vui lòng chọn Namespace', 'error'); return; }
 
-    saLog(`=== Tạo ServiceAccount: ${sa} @ ${ns} ===`);
+    ;
 
     // Create namespace
     await kubectl(['create', 'ns', ns, '--dry-run=client', '-o', 'yaml'], null);
@@ -234,27 +225,27 @@ function initSAButtons() {
 
     // Namespace role bindings
     await applyNsBindings(sa, ns, 'sa-create-ns-list');
-    saLog('=== Hoàn thành ===', 'success');
+    showSAToast('Hoàn thành!', 'success');
   });
 
   // === DELETE SA ===
   document.getElementById('sa-btn-delete')?.addEventListener('click', async () => {
     const sa = document.getElementById('sa-delete-name').value;
     const ns = document.getElementById('sa-delete-ns').value;
-    if (!sa) { saLog('Vui lòng chọn SA', 'error'); return; }
-    if (!ns) { saLog('Vui lòng chọn Namespace', 'error'); return; }
+    if (!sa) { showSAToast('Vui lòng chọn SA', 'error'); return; }
+    if (!ns) { showSAToast('Vui lòng chọn Namespace', 'error'); return; }
 
     const confirmed = await saConfirm(`Xác nhận xóa ServiceAccount "${sa}" trong namespace "${ns}"?`);
     if (!confirmed) return;
 
-    saLog(`=== Xóa ServiceAccount: ${sa} @ ${ns} ===`);
+    ;
 
     // Delete legacy token
     await kubectl(['delete', 'secret', `${sa}-legacy-token`, '-n', ns, '--ignore-not-found']);
     // Delete SA
     await kubectl(['delete', 'sa', sa, '-n', ns, '--ignore-not-found']);
 
-    saLog('=== Đã xóa ===', 'success');
+    showSAToast('Đã xóa ServiceAccount!', 'success');
     // Reload SA dropdown
     loadServiceAccounts(ns, 'sa-delete-name');
   });
@@ -263,24 +254,24 @@ function initSAButtons() {
   document.getElementById('sa-btn-update')?.addEventListener('click', async () => {
     const sa = document.getElementById('sa-update-name').value;
     const ns = document.getElementById('sa-update-ns').value;
-    if (!sa) { saLog('Vui lòng chọn SA', 'error'); return; }
-    if (!ns) { saLog('Vui lòng chọn Namespace', 'error'); return; }
+    if (!sa) { showSAToast('Vui lòng chọn SA', 'error'); return; }
+    if (!ns) { showSAToast('Vui lòng chọn Namespace', 'error'); return; }
 
-    saLog(`=== Update RBAC cho: ${sa} @ ${ns} ===`);
+    ;
 
     // Apply new bindings
     await applyNsBindings(sa, ns, 'sa-update-ns-list');
-    saLog('=== RBAC updated ===', 'success');
+    showSAToast('RBAC updated!', 'success');
   });
 
   // === EXPORT KUBECONFIG ===
   document.getElementById('sa-btn-export')?.addEventListener('click', async () => {
     const sa = document.getElementById('sa-export-name').value;
     const ns = document.getElementById('sa-export-ns').value;
-    if (!sa) { saLog('Vui lòng chọn SA', 'error'); return; }
-    if (!ns) { saLog('Vui lòng chọn Namespace', 'error'); return; }
+    if (!sa) { showSAToast('Vui lòng chọn SA', 'error'); return; }
+    if (!ns) { showSAToast('Vui lòng chọn Namespace', 'error'); return; }
 
-    saLog(`=== Export Kubeconfig cho: ${sa} @ ${ns} ===`);
+    ;
 
     const tokenType = document.getElementById('sa-export-token-type').value;
     if (tokenType === 'expiring') {
@@ -299,7 +290,7 @@ function initSAButtons() {
         await exportKubeconfig(sa, ns, token, 'legacy');
       }
     }
-    saLog('=== Hoàn thành ===', 'success');
+    showSAToast('Hoàn thành!', 'success');
   });
 }
 
@@ -359,7 +350,7 @@ subjects:
   namespace: ${saNamespace}`;
     await kubectl(['apply', '-f', '-'], metricsRbYaml);
 
-    saLog(`Gán ${role} + metrics-reader cho ${bindNs}`, 'success');
+    showSAToast(`Gán ${role} + metrics-reader cho ${bindNs}`, 'success');
   }
 }
 
@@ -371,7 +362,7 @@ async function exportKubeconfig(sa, ns, token, suffix) {
   const caResult = await kubectl(['config', 'view', '--raw', '--minify', '-o', 'jsonpath={.clusters[0].cluster.certificate-authority-data}']);
 
   if (!clusterNameResult?.success || !serverResult?.success) {
-    saLog('Không thể lấy cluster info', 'error');
+    showSAToast('Không thể lấy cluster info', 'error');
     return;
   }
 
@@ -398,13 +389,6 @@ contexts:
     namespace: ${ns}
 current-context: ${sa}@${clusterName}`;
 
-  // Copy to clipboard
-  try {
-    await navigator.clipboard.writeText(kubeconfig);
-    saLog(`Kubeconfig đã copy vào clipboard`, 'success');
-  } catch {
-    saLog('Không thể copy vào clipboard', 'error');
-  }
 
   // Save file with dialog
   if (saInvoke) {
@@ -418,16 +402,15 @@ current-context: ${sa}@${clusterName}`;
       if (filePath) {
         const result = await saInvoke('save_file', { path: filePath, content: kubeconfig });
         if (result.success) {
-          saLog(`File saved: ${filePath}`, 'success');
+          showSAToast(`File saved: ${filePath}`, 'success');
         } else {
-          saLog(result.stderr, 'error');
+          showSAToast(result.stderr, 'error');
         }
       }
     } catch (e) {
-      saLog(`Save error: ${e}`, 'error');
+      showSAToast(`Save error: ${e}`, 'error');
     }
   }
 
   // Also show in log
-  saLog(`\n--- KUBECONFIG (${sa}-${ns}-${suffix}) ---\n${kubeconfig}\n--- END ---`);
 }

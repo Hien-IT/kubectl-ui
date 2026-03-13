@@ -35,9 +35,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   initModal();
   updatePreview();
   initSAManager(invoke);
+  initNamespaceDropdown();
   
   if (isTauri) {
     loadContexts();
+    loadYamlNamespaces();
   } else {
     const ctxSelect = document.getElementById('kubectl-context');
     ctxSelect.innerHTML = '<option>Browser Mode</option>';
@@ -85,6 +87,8 @@ document.getElementById('kubectl-context')?.addEventListener('change', async (e)
         const { reloadAllNamespaces } = await import('./sa-manager.js');
         reloadAllNamespaces();
       }
+      // Reload YAML namespace dropdown
+      loadYamlNamespaces();
     } else {
       showToast(`Failed: ${result.stderr}`, 'error');
       statusEl.classList.add('error');
@@ -308,8 +312,8 @@ function collectConfig() {
 
   return {
     appName,
-    namespace: document.getElementById('namespace').value.trim() || 'default',
-    createNamespace: document.getElementById('create-namespace').checked,
+    namespace: getNamespace(),
+    createNamespace: document.getElementById('namespace').value === '__create__',
     labels: selectorLabels,
     selectorLabels: { app: appName },
     enableDeployment: document.getElementById('enable-deployment').checked,
@@ -1187,17 +1191,67 @@ function setModalResult(result, commandText) {
   }
 }
 
+// ===== Namespace Dropdown =====
+function getNamespace() {
+  const sel = document.getElementById('namespace');
+  if (sel.value === '__create__') {
+    return document.getElementById('namespace-new').value.trim() || 'default';
+  }
+  return sel.value || 'default';
+}
+
+function initNamespaceDropdown() {
+  const sel = document.getElementById('namespace');
+  const newInput = document.getElementById('namespace-new');
+  sel?.addEventListener('change', () => {
+    newInput.style.display = sel.value === '__create__' ? 'block' : 'none';
+    updatePreview();
+  });
+  newInput?.addEventListener('input', () => updatePreview());
+}
+
+async function loadYamlNamespaces() {
+  if (!invoke) return;
+  try {
+    const result = await invoke('run_kubectl', { args: ['get', 'ns', '-o', 'jsonpath={.items[*].metadata.name}'], stdinInput: null });
+    if (!result?.success) return;
+    const nsList = result.stdout.trim().split(/\s+/).filter(Boolean);
+    const sel = document.getElementById('namespace');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">-- Chọn Namespace --</option><option value="__create__">+ Tạo Namespace mới</option>';
+    nsList.forEach(ns => {
+      const opt = document.createElement('option');
+      opt.value = ns; opt.textContent = ns;
+      if (ns === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+
 // ===== Kubectl Apply =====
 async function applyAllFiles() {
   if (!invoke) { showToast('kubectl apply chỉ khả dụng trong Tauri desktop app', 'error'); return; }
-  const fileCount = Object.keys(generatedFiles).length;
-  if (fileCount === 0) { showToast('Không có resource nào được bật', 'error'); return; }
-  const namespace = document.getElementById('namespace').value.trim() || 'default';
-  showModal(`kubectl apply (${fileCount} files)`);
+  const files = Object.entries(generatedFiles);
+  if (files.length === 0) { showToast('Không có resource nào được bật', 'error'); return; }
+  const namespace = getNamespace();
+
+  const fileDetails = files.map(([name, content]) => {
+    const lines = content.split('\n').length;
+    return `📄 ${name} (${lines} dòng)`;
+  }).join('\n');
+
+  const confirmed = await showConfirmModal(
+    `kubectl apply -n ${namespace}`,
+    `Sẽ apply ${files.length} file(s) vào namespace "${namespace}":\n\n${fileDetails}`,
+    'Apply'
+  );
+  if (!confirmed) return;
+
+  showModal(`kubectl apply (${files.length} files)`);
   try {
     const result = await invoke('save_and_apply_files', { files: generatedFiles, namespace });
     setModalResult(result, `kubectl apply -f ./manifests/ -n ${namespace}`);
-    if (result.success) showToast(`Applied ${fileCount} resources successfully!`, 'success');
+    if (result.success) showToast(`Applied ${files.length} resources successfully!`, 'success');
   } catch (e) {
     setModalResult({ success: false, stdout: '', stderr: `Error: ${e}` }, 'kubectl apply');
   }
@@ -1207,8 +1261,17 @@ async function applyCurrentFile() {
   if (!invoke) { showToast('kubectl apply chỉ khả dụng trong Tauri desktop app', 'error'); return; }
   const yaml = getCurrentYaml();
   if (!yaml) { showToast('Không có YAML nào để apply', 'error'); return; }
-  const namespace = document.getElementById('namespace').value.trim() || 'default';
+  const namespace = getNamespace();
   const fileName = currentPreviewTab === 'all' ? 'all resources' : currentPreviewTab;
+  const lines = yaml.split('\n').length;
+
+  const confirmed = await showConfirmModal(
+    `kubectl apply -n ${namespace}`,
+    `Sẽ apply:\n\n📄 ${fileName} (${lines} dòng)`,
+    'Apply'
+  );
+  if (!confirmed) return;
+
   showModal(`kubectl apply — ${fileName}`);
   try {
     const result = await invoke('apply_yaml', { yaml, namespace });
@@ -1219,11 +1282,44 @@ async function applyCurrentFile() {
   }
 }
 
+// ===== Confirm Modal =====
+function showConfirmModal(title, detail, actionLabel = 'OK') {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:500px;">
+        <div class="modal-header">
+          <h3>⚠️ ${title}</h3>
+        </div>
+        <div class="modal-body" style="padding:16px;">
+          <pre style="margin:0;color:var(--text-primary);font-size:0.85rem;white-space:pre-wrap;font-family:inherit;">${detail}</pre>
+        </div>
+        <div class="modal-footer" style="justify-content:flex-end;gap:8px;">
+          <button class="btn btn-ghost btn-sm confirm-no">Hủy</button>
+          <button class="btn btn-success btn-sm confirm-yes">${actionLabel}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.confirm-yes').addEventListener('click', () => {
+      overlay.remove();
+      resolve(true);
+    });
+    overlay.querySelector('.confirm-no').addEventListener('click', () => {
+      overlay.remove();
+      resolve(false);
+    });
+  });
+}
+
 // ===== Actions =====
 function initActions() {
   document.getElementById('btn-copy').addEventListener('click', () => {
     const yaml = getCurrentYaml();
-    navigator.clipboard.writeText(yaml).then(() => showToast('Copied to clipboard!', 'success'));
+    if (!yaml) return;
+    navigator.clipboard.writeText(yaml);
   });
 
   document.getElementById('btn-download').addEventListener('click', () => {
@@ -1236,11 +1332,24 @@ function initActions() {
     showToast('File downloaded!', 'success');
   });
 
-  document.getElementById('btn-download-all').addEventListener('click', () => {
+  document.getElementById('btn-download-all').addEventListener('click', async () => {
     const files = Object.entries(generatedFiles);
     if (files.length === 0) { showToast('No resources enabled', 'error'); return; }
-    const combined = files.map(([name, content]) => `# --- ${name} ---\n${content}`).join('\n\n---\n\n');
+
+    const fileDetails = files.map(([name, content]) => {
+      const lines = content.split('\n').length;
+      return `📄 ${name} (${lines} dòng)`;
+    }).join('\n');
+
     const appName = document.getElementById('app-name').value.trim() || 'my-app';
+    const confirmed = await showConfirmModal(
+      `Download All`,
+      `Sẽ tải ${files.length} file(s) thành 1 file "${appName}-k8s.yaml":\n\n${fileDetails}`,
+      'Download'
+    );
+    if (!confirmed) return;
+
+    const combined = files.map(([name, content]) => `# --- ${name} ---\n${content}`).join('\n\n---\n\n');
     downloadFile(`${appName}-k8s.yaml`, combined);
     showToast(`Downloaded ${files.length} resources!`, 'success');
   });
