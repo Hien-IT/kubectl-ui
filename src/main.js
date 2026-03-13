@@ -1,5 +1,6 @@
 import './style.css';
 import { getAllYaml } from './generators.js';
+import { initSAManager } from './sa-manager.js';
 
 // ===== Tauri API (lazy loaded) =====
 let invoke = null;
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTlsToggle();
   initModal();
   updatePreview();
+  initSAManager(invoke);
   
   if (isTauri) {
     loadContexts();
@@ -78,6 +80,11 @@ document.getElementById('kubectl-context')?.addEventListener('change', async (e)
     if (result.success) {
       showToast(`Switched to ${context}`, 'success');
       statusEl.classList.remove('error');
+      // Reload SA Manager dropdowns if SA page is active
+      if (document.getElementById('page-sa-manager')?.classList.contains('active')) {
+        const { reloadAllNamespaces } = await import('./sa-manager.js');
+        reloadAllNamespaces();
+      }
     } else {
       showToast(`Failed: ${result.stderr}`, 'error');
       statusEl.classList.add('error');

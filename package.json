@@ -1,7 +1,7 @@
 {
   "name": "kubectl-ui",
   "version": "1.0.0",
-  "description": "K8s YAML Generator - Desktop tool to generate and apply Kubernetes deployment files",
+  "description": "K8s Manager - Desktop tool to generate and apply Kubernetes deployment files",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,7 @@
     "vite": "^6.2.2"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.5.0"
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-dialog": "^2.6.0"
   }
 }

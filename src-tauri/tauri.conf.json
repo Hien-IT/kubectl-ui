@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Kubectl UI - K8s YAML Generator",
+        "title": "Kubectl UI",
         "width": 1400,
         "height": 900,
         "minWidth": 1000,

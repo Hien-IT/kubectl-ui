@@ -1,6 +1,7 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -18,6 +19,9 @@ pub fn run() {
             switch_context,
             get_current_context,
             save_yaml_to_dir,
+            run_kubectl,
+            save_file,
+            get_home_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -153,6 +157,90 @@ fn switch_context(context: String) -> CmdResult {
     let mut cmd = Command::new("kubectl");
     cmd.arg("config").arg("use-context").arg(&context);
     run_command(&mut cmd)
+}
+
+/// Save content to a specific file path
+#[tauri::command]
+fn save_file(path: String, content: String) -> CmdResult {
+    let file_path = std::path::PathBuf::from(&path);
+    if let Some(parent) = file_path.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            return CmdResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to create directory: {}", e),
+            };
+        }
+    }
+    match fs::write(&file_path, &content) {
+        Ok(_) => CmdResult {
+            success: true,
+            stdout: format!("Saved to {}", path),
+            stderr: String::new(),
+        },
+        Err(e) => CmdResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Failed to write: {}", e),
+        },
+    }
+}
+
+/// Get user home directory
+#[tauri::command]
+fn get_home_dir() -> CmdResult {
+    match std::env::var("HOME") {
+        Ok(home) => CmdResult {
+            success: true,
+            stdout: home,
+            stderr: String::new(),
+        },
+        Err(_) => CmdResult {
+            success: false,
+            stdout: String::new(),
+            stderr: "Cannot get HOME".to_string(),
+        },
+    }
+}
+
+/// Run any kubectl command with args + optional stdin
+#[tauri::command]
+fn run_kubectl(args: Vec<String>, stdin_input: Option<String>) -> CmdResult {
+    let mut cmd = Command::new("kubectl");
+    for arg in &args {
+        cmd.arg(arg);
+    }
+    if let Some(input) = stdin_input {
+        use std::process::Stdio;
+        cmd.stdin(Stdio::piped());
+        match cmd.spawn() {
+            Ok(mut child) => {
+                use std::io::Write;
+                if let Some(mut child_stdin) = child.stdin.take() {
+                    let _ = child_stdin.write_all(input.as_bytes());
+                }
+                match child.wait_with_output() {
+                    Ok(output) => CmdResult {
+                        success: output.status.success(),
+                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                    },
+                    Err(e) => CmdResult {
+                        success: false,
+                        stdout: String::new(),
+                        stderr: format!("Failed: {}", e),
+                    },
+                }
+            }
+            Err(e) => CmdResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to spawn: {}", e),
+            },
+        }
+    } else {
+        run_command(&mut cmd)
+    }
 }
 
 fn run_command(cmd: &mut Command) -> CmdResult {

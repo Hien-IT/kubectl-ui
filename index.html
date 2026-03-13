@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kubectl UI - K8s YAML Generator</title>
+  <title>Kubectl UI</title>
   <meta name="description" content="Desktop tool to quickly generate and apply Kubernetes deployment YAML files" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@
           </svg>
           <h1>Kubectl UI</h1>
         </div>
-        <span class="subtitle">K8s YAML Generator</span>
+        <span class="subtitle">K8s Manager</span>
       </div>
       <div class="header-center">
         <div class="context-selector">
@@ -47,6 +47,21 @@
       </div>
     </header>
 
+    <div class="app-body">
+      <!-- Left Sidebar -->
+      <nav class="sidebar">
+        <button class="sidebar-item active" data-page="yaml-generator" title="YAML Generator">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.5"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>YAML</span>
+        </button>
+        <button class="sidebar-item" data-page="sa-manager" title="SA Manager">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>SA</span>
+        </button>
+      </nav>
+
+      <!-- Page: YAML Generator -->
+      <div class="page active" id="page-yaml-generator">
     <!-- Main Content -->
     <main class="main">
       <!-- Left: Form Panel -->
@@ -528,6 +543,138 @@
         </div>
       </div>
     </main>
+      </div><!-- /page-yaml-generator -->
+
+      <!-- Page: SA Manager -->
+      <div class="page" id="page-sa-manager">
+        <div class="sa-manager">
+          <div class="sa-header">
+            <h2>🔑 Service Account Manager</h2>
+            <p class="hint">Quản lý ServiceAccount, RBAC và xuất kubeconfig</p>
+          </div>
+
+          <!-- Action Cards -->
+          <div class="sa-actions">
+            <button class="sa-action-card active" data-action="create">
+              <span class="sa-action-icon">➕</span>
+              <span>Tạo SA</span>
+            </button>
+            <button class="sa-action-card" data-action="delete">
+              <span class="sa-action-icon">🗑️</span>
+              <span>Xóa SA</span>
+            </button>
+            <button class="sa-action-card" data-action="update">
+              <span class="sa-action-icon">🔄</span>
+              <span>Update RBAC</span>
+            </button>
+            <button class="sa-action-card" data-action="export">
+              <span class="sa-action-icon">📤</span>
+              <span>Export Kubeconfig</span>
+            </button>
+          </div>
+
+          <!-- Create SA Form -->
+          <div class="sa-form active" id="sa-form-create">
+            <h3 class="form-subtitle">Tạo ServiceAccount</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>SA Name</label>
+                <input type="text" id="sa-create-name" placeholder="my-service-account" />
+              </div>
+              <div class="form-group">
+                <label>Namespace</label>
+                <select id="sa-create-ns"><option value="">-- Chọn Namespace --</option></select>
+              </div>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Gán quyền Namespace</h3>
+            <div class="sa-ns-list" id="sa-create-ns-list"></div>
+            <button class="btn btn-ghost btn-sm" id="sa-btn-add-ns-binding">+ Add Namespace Binding</button>
+            <div style="margin-top:16px;">
+              <button class="btn btn-success" id="sa-btn-create">🚀 Tạo ServiceAccount</button>
+            </div>
+          </div>
+
+          <!-- Delete SA Form -->
+          <div class="sa-form" id="sa-form-delete">
+            <h3 class="form-subtitle">Xóa ServiceAccount</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Namespace</label>
+                <select id="sa-delete-ns"><option value="">-- Chọn Namespace --</option></select>
+              </div>
+              <div class="form-group">
+                <label>SA Name</label>
+                <select id="sa-delete-name"><option value="">-- Chọn SA --</option></select>
+              </div>
+            </div>
+            <p class="hint" style="margin:8px 0;">⚠️ Sẽ xóa SA, RoleBindings và legacy token secret</p>
+            <button class="btn btn-danger" id="sa-btn-delete">🗑️ Xóa ServiceAccount</button>
+          </div>
+
+          <!-- Update RBAC Form -->
+          <div class="sa-form" id="sa-form-update">
+            <h3 class="form-subtitle">Update RBAC</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>SA Namespace</label>
+                <select id="sa-update-ns"><option value="">-- Chọn Namespace --</option></select>
+              </div>
+              <div class="form-group">
+                <label>SA Name</label>
+                <select id="sa-update-name"><option value="">-- Chọn SA --</option></select>
+              </div>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Gán quyền mới</h3>
+            <div class="sa-ns-list" id="sa-update-ns-list"></div>
+            <button class="btn btn-ghost btn-sm" id="sa-btn-add-ns-binding-update">+ Add Namespace Binding</button>
+            <div style="margin-top:16px;">
+              <button class="btn btn-primary" id="sa-btn-update">🔄 Update RBAC</button>
+            </div>
+          </div>
+
+          <!-- Export Kubeconfig Form -->
+          <div class="sa-form" id="sa-form-export">
+            <h3 class="form-subtitle">Export Kubeconfig</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>SA Namespace</label>
+                <select id="sa-export-ns"><option value="">-- Chọn Namespace --</option></select>
+              </div>
+              <div class="form-group">
+                <label>SA Name</label>
+                <select id="sa-export-name"><option value="">-- Chọn SA --</option></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Token Type</label>
+                <select id="sa-export-token-type">
+                  <option value="expiring">Có thời hạn</option>
+                  <option value="legacy">Không hết hạn (legacy)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Duration</label>
+                <input type="text" id="sa-export-duration" placeholder="24h, 7d, 2w" value="24h" />
+              </div>
+            </div>
+            <button class="btn btn-primary" id="sa-btn-export">📤 Export Kubeconfig</button>
+          </div>
+
+          <!-- Log Output -->
+          <div class="sa-log" id="sa-log">
+            <div class="sa-log-header">
+              <span>📋 Output</span>
+              <button class="btn btn-ghost btn-sm" id="sa-btn-clear-log">Clear</button>
+            </div>
+            <pre class="sa-log-content" id="sa-log-content">Ready...</pre>
+          </div>
+        </div>
+      </div><!-- /page-sa-manager -->
+
+    </div><!-- /app-body -->
 
     <!-- Terminal Modal -->
     <div class="modal-overlay" id="terminal-modal" style="display:none;">
