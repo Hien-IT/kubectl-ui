@@ -1,0 +1,19 @@
+{
+  "name": "kubectl-ui",
+  "version": "1.0.0",
+  "description": "K8s YAML Generator - Desktop tool to generate and apply Kubernetes deployment files",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
+    "vite": "^6.2.2"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.5.0"
+  }
+}

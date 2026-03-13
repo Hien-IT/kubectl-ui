@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kubectl UI - K8s YAML Generator</title>
+  <meta name="description" content="Desktop tool to quickly generate and apply Kubernetes deployment YAML files" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+            <path d="M16 6L10 10V18L16 22L22 18V10L16 6Z" stroke="white" stroke-width="1.5" fill="none"/>
+            <circle cx="16" cy="14" r="3" fill="white" opacity="0.9"/>
+            <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+          </svg>
+          <h1>Kubectl UI</h1>
+        </div>
+        <span class="subtitle">K8s YAML Generator</span>
+      </div>
+      <div class="header-center">
+        <div class="context-selector">
+          <label>Context:</label>
+          <select id="kubectl-context">
+            <option value="">Loading...</option>
+          </select>
+          <div class="context-status" id="context-status"></div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button id="btn-apply-all" class="btn btn-success">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          kubectl apply
+        </button>
+        <button id="btn-download-all" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l3-3m-3 3L5 7M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download All
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Left: Form Panel -->
+      <div class="panel panel-form">
+        <div class="tabs" id="resource-tabs">
+          <button class="tab active" data-tab="general">General</button>
+          <button class="tab" data-tab="deployment">Deployment</button>
+          <button class="tab" data-tab="service">Service</button>
+          <button class="tab" data-tab="ingress">Ingress</button>
+          <button class="tab" data-tab="pvc">PVC</button>
+          <button class="tab" data-tab="configmap">ConfigMap</button>
+          <button class="tab" data-tab="secret">Secret</button>
+          <button class="tab" data-tab="hpa">HPA</button>
+        </div>
+
+        <div class="tab-content">
+          <!-- General Tab -->
+          <div class="tab-pane active" id="tab-general">
+            <div class="section-header">
+              <h2>General Information</h2>
+              <p>Thông tin chung cho tất cả resources</p>
+            </div>
+            <div class="form-group">
+              <label for="app-name">App Name <span class="required">*</span></label>
+              <input type="text" id="app-name" placeholder="my-app" value="my-app" />
+            </div>
+            <div class="form-group">
+              <label for="namespace">Namespace</label>
+              <input type="text" id="namespace" placeholder="default" value="default" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Create Namespace</label>
+                <label class="toggle">
+                  <input type="checkbox" id="create-namespace" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="labels">Custom Labels</label>
+              <div class="kv-list" id="labels-list">
+                <div class="kv-row">
+                  <input type="text" placeholder="key" value="app" class="kv-key" />
+                  <input type="text" placeholder="value" value="my-app" class="kv-value" />
+                  <button class="btn-icon btn-remove-kv" title="Remove">×</button>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-add-kv" data-target="labels-list">+ Add Label</button>
+            </div>
+          </div>
+
+          <!-- Deployment Tab -->
+          <div class="tab-pane" id="tab-deployment">
+            <div class="section-header">
+              <h2>Deployment</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-deployment" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="image">Container Image <span class="required">*</span></label>
+                <input type="text" id="image" placeholder="nginx:latest" value="nginx:latest" />
+              </div>
+              <div class="form-group">
+                <label for="replicas">Replicas</label>
+                <input type="number" id="replicas" value="1" min="1" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="image-pull-policy">Image Pull Policy</label>
+              <select id="image-pull-policy">
+                <option value="IfNotPresent">IfNotPresent</option>
+                <option value="Always">Always</option>
+                <option value="Never">Never</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Image Pull Secrets <span class="hint">(chọn Secret type dockerconfigjson)</span></label>
+              <div class="env-from-list" id="image-pull-secrets-list"></div>
+              <button class="btn btn-ghost" id="btn-add-pull-secret">+ Add Pull Secret</button>
+            </div>
+            <div class="form-group">
+              <label>Container Ports</label>
+              <div class="port-list" id="container-ports">
+                <div class="port-row">
+                  <input type="text" placeholder="Name" value="http" class="port-name" />
+                  <input type="number" placeholder="Port" value="80" class="port-number" />
+                  <select class="port-protocol">
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                  </select>
+                  <button class="btn-icon btn-remove-port" title="Remove">×</button>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-add-port" data-target="container-ports">+ Add Port</button>
+            </div>
+            <div class="form-group">
+              <label>Environment Variables</label>
+              <div class="env-var-list" id="env-vars-list"></div>
+              <button class="btn btn-ghost" id="btn-add-env">+ Add Env Variable</button>
+            </div>
+            <div class="form-group">
+              <label>envFrom <span class="hint">(import tất cả keys từ ConfigMap/Secret)</span></label>
+              <div class="env-from-list" id="env-from-list"></div>
+              <button class="btn btn-ghost" id="btn-add-envfrom">+ Add envFrom</button>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Resource Limits</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cpu-request">CPU Request</label>
+                <input type="text" id="cpu-request" placeholder="100m" />
+              </div>
+              <div class="form-group">
+                <label for="cpu-limit">CPU Limit</label>
+                <input type="text" id="cpu-limit" placeholder="500m" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="mem-request">Memory Request</label>
+                <input type="text" id="mem-request" placeholder="128Mi" />
+              </div>
+              <div class="form-group">
+                <label for="mem-limit">Memory Limit</label>
+                <input type="text" id="mem-limit" placeholder="256Mi" />
+              </div>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Security Context</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sc-run-as-user">runAsUser</label>
+                <input type="number" id="sc-run-as-user" placeholder="e.g. 1000" />
+              </div>
+              <div class="form-group">
+                <label for="sc-run-as-group">runAsGroup</label>
+                <input type="number" id="sc-run-as-group" placeholder="e.g. 1000" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sc-fs-group">fsGroup</label>
+                <input type="number" id="sc-fs-group" placeholder="e.g. 1000" />
+              </div>
+              <div class="form-group" style="display:flex;flex-direction:column;justify-content:center;gap:8px;">
+                <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;">
+                  <input type="checkbox" id="sc-run-as-nonroot" style="width:auto;" /> 
+                  <span>runAsNonRoot</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;">
+                  <input type="checkbox" id="sc-readonly-root" style="width:auto;" />
+                  <span>readOnlyRootFilesystem</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Node Selector</h3>
+            <div class="kv-list" id="node-selector-list"></div>
+            <button class="btn btn-ghost btn-sm" id="btn-add-node-selector">+ Add Selector</button>
+
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Health Checks</h3>
+            <!-- Liveness Probe -->
+            <div class="probe-section">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <label class="toggle-section" style="margin:0;">
+                  <input type="checkbox" id="enable-liveness" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size:0.85rem;font-weight:500;color:var(--text-secondary);">Liveness Probe</span>
+              </div>
+              <div id="liveness-fields" style="display:none;">
+                <div class="form-row" style="margin-bottom:8px;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Type</label>
+                    <select id="liveness-type">
+                      <option value="httpGet">HTTP GET</option>
+                      <option value="tcpSocket">TCP Socket</option>
+                      <option value="exec">Exec Command</option>
+                    </select>
+                  </div>
+                  <div class="form-group liveness-http" style="margin-bottom:0;">
+                    <label>Path</label>
+                    <input type="text" id="liveness-path" placeholder="/healthz" value="/healthz" />
+                  </div>
+                </div>
+                <div class="form-row liveness-http" style="margin-bottom:8px;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Port</label>
+                    <input type="number" id="liveness-port" placeholder="80" value="80" />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;"></div>
+                </div>
+                <div class="form-group liveness-tcp" style="display:none;margin-bottom:8px;">
+                  <label>Port</label>
+                  <input type="number" id="liveness-tcp-port" placeholder="80" value="80" />
+                </div>
+                <div class="form-group liveness-exec" style="display:none;margin-bottom:8px;">
+                  <label>Command <span class="hint">(one per line)</span></label>
+                  <textarea id="liveness-exec-cmd" rows="2" placeholder="cat&#10;/tmp/healthy"></textarea>
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Initial Delay (s)</label>
+                    <input type="number" id="liveness-delay" placeholder="15" value="15" />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Period (s)</label>
+                    <input type="number" id="liveness-period" placeholder="20" value="20" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Readiness Probe -->
+            <div class="probe-section" style="margin-top:12px;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <label class="toggle-section" style="margin:0;">
+                  <input type="checkbox" id="enable-readiness" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size:0.85rem;font-weight:500;color:var(--text-secondary);">Readiness Probe</span>
+              </div>
+              <div id="readiness-fields" style="display:none;">
+                <div class="form-row" style="margin-bottom:8px;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Type</label>
+                    <select id="readiness-type">
+                      <option value="httpGet">HTTP GET</option>
+                      <option value="tcpSocket">TCP Socket</option>
+                      <option value="exec">Exec Command</option>
+                    </select>
+                  </div>
+                  <div class="form-group readiness-http" style="margin-bottom:0;">
+                    <label>Path</label>
+                    <input type="text" id="readiness-path" placeholder="/ready" value="/ready" />
+                  </div>
+                </div>
+                <div class="form-row readiness-http" style="margin-bottom:8px;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Port</label>
+                    <input type="number" id="readiness-port" placeholder="80" value="80" />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;"></div>
+                </div>
+                <div class="form-group readiness-tcp" style="display:none;margin-bottom:8px;">
+                  <label>Port</label>
+                  <input type="number" id="readiness-tcp-port" placeholder="80" value="80" />
+                </div>
+                <div class="form-group readiness-exec" style="display:none;margin-bottom:8px;">
+                  <label>Command <span class="hint">(one per line)</span></label>
+                  <textarea id="readiness-exec-cmd" rows="2" placeholder="cat&#10;/tmp/ready"></textarea>
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Initial Delay (s)</label>
+                    <input type="number" id="readiness-delay" placeholder="5" value="5" />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label>Period (s)</label>
+                    <input type="number" id="readiness-period" placeholder="10" value="10" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Volume Mounts</h3>
+            <div class="mount-list" id="volume-mounts"></div>
+            <button class="btn btn-ghost" id="btn-add-mount">+ Add Volume Mount</button>
+            <div class="init-container-section" style="margin-top:16px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <label class="toggle-section" style="margin:0;">
+                  <input type="checkbox" id="enable-init-permissions" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size:0.85rem;font-weight:500;color:var(--text-secondary);">Init Container — Fix PVC Permissions</span>
+                <span class="hint">(dùng runAsUser/runAsGroup từ Security Context)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Service Tab -->
+          <div class="tab-pane" id="tab-service">
+            <div class="section-header">
+              <h2>Service</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-service" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="resource-items-list" id="service-items-list"></div>
+            <button class="btn btn-ghost" id="btn-add-service">+ Add Service</button>
+          </div>
+
+          <!-- Ingress Tab -->
+          <div class="tab-pane" id="tab-ingress">
+            <div class="section-header">
+              <h2>Ingress</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-ingress" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="ingress-class">Ingress Class</label>
+              <input type="text" id="ingress-class" placeholder="nginx" value="nginx" />
+            </div>
+            <div class="form-group">
+              <label>Rules</label>
+              <div class="ingress-rules-list" id="ingress-rules">
+                <div class="ingress-rule">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Host</label>
+                      <input type="text" placeholder="example.com" class="ingress-host" />
+                    </div>
+                  </div>
+                  <div class="ingress-paths">
+                    <div class="ingress-path-row">
+                      <input type="text" placeholder="Path" value="/" class="ingress-path" />
+                      <select class="ingress-path-type">
+                        <option value="Prefix">Prefix</option>
+                        <option value="Exact">Exact</option>
+                        <option value="ImplementationSpecific">ImplementationSpecific</option>
+                      </select>
+                      <select class="ingress-svc-name"><option value="">-- Service --</option></select>
+                      <input type="number" placeholder="Port" value="80" class="ingress-svc-port" />
+                      <button class="btn-icon btn-remove-ingress-path" title="Remove">×</button>
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost btn-add-ingress-path">+ Add Path</button>
+                </div>
+              </div>
+              <button class="btn btn-ghost" id="btn-add-ingress-rule">+ Add Rule</button>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">TLS</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Enable TLS</label>
+                <label class="toggle">
+                  <input type="checkbox" id="ingress-tls" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="tls-fields" style="display:none;">
+              <div class="form-group">
+                <label for="tls-secret">TLS Secret Name</label>
+                <input type="text" id="tls-secret" placeholder="tls-secret" />
+              </div>
+              <div class="form-group">
+                <label>TLS Hosts</label>
+                <div class="kv-list" id="tls-hosts-list">
+                  <div class="kv-row single">
+                    <input type="text" placeholder="example.com" class="kv-key" />
+                    <button class="btn-icon btn-remove-kv" title="Remove">×</button>
+                  </div>
+                </div>
+                <button class="btn btn-ghost btn-add-single" data-target="tls-hosts-list">+ Add Host</button>
+              </div>
+            </div>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Annotations</h3>
+            <div class="annotation-presets" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+              <button class="btn-chip" data-key="cert-manager.io/cluster-issuer" data-val="letsencrypt">cert-manager issuer</button>
+              <button class="btn-chip" data-key="cert-manager.io/renew-before" data-val="180h">renew-before</button>
+              <button class="btn-chip" data-key="nginx.ingress.kubernetes.io/proxy-body-size" data-val="15m">proxy-body-size</button>
+              <button class="btn-chip" data-key="nginx.ingress.kubernetes.io/ssl-passthrough" data-val="true">ssl-passthrough</button>
+              <button class="btn-chip" data-key="nginx.ingress.kubernetes.io/use-regex" data-val="true">use-regex</button>
+            </div>
+            <div class="kv-list" id="ingress-annotations-list"></div>
+            <button class="btn btn-ghost btn-add-kv" data-target="ingress-annotations-list">+ Add Annotation</button>
+          </div>
+
+          <!-- PVC Tab -->
+          <div class="tab-pane" id="tab-pvc">
+            <div class="section-header">
+              <h2>PersistentVolumeClaim</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-pvc" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="resource-items-list" id="pvc-items-list"></div>
+            <button class="btn btn-ghost" id="btn-add-pvc">+ Add PVC</button>
+          </div>
+
+          <!-- ConfigMap Tab -->
+          <div class="tab-pane" id="tab-configmap">
+            <div class="section-header">
+              <h2>ConfigMap</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-configmap" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="resource-items-list" id="configmap-items-list"></div>
+            <button class="btn btn-ghost" id="btn-add-configmap">+ Add ConfigMap</button>
+          </div>
+
+          <!-- Secret Tab -->
+          <div class="tab-pane" id="tab-secret">
+            <div class="section-header">
+              <h2>Secret</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-secret" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="resource-items-list" id="secret-items-list"></div>
+            <button class="btn btn-ghost" id="btn-add-secret">+ Add Secret</button>
+          </div>
+
+          <!-- HPA Tab -->
+          <div class="tab-pane" id="tab-hpa">
+            <div class="section-header">
+              <h2>HorizontalPodAutoscaler</h2>
+              <label class="toggle-section">
+                <input type="checkbox" id="enable-hpa" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="hpa-min">Min Replicas</label>
+                <input type="number" id="hpa-min" value="1" min="1" />
+              </div>
+              <div class="form-group">
+                <label for="hpa-max">Max Replicas</label>
+                <input type="number" id="hpa-max" value="5" min="1" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="hpa-cpu">CPU Target (%)</label>
+                <input type="number" id="hpa-cpu" placeholder="80" />
+              </div>
+              <div class="form-group">
+                <label for="hpa-memory">Memory Target (%)</label>
+                <input type="number" id="hpa-memory" placeholder="80" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Preview Panel -->
+      <div class="panel panel-preview">
+        <div class="preview-header">
+          <div class="preview-tabs" id="preview-tabs">
+            <!-- Tabs generated dynamically -->
+          </div>
+          <div class="preview-actions">
+            <button id="btn-apply-current" class="btn btn-success btn-sm" title="Apply this file">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Apply
+            </button>
+            <button id="btn-copy" class="btn btn-ghost btn-sm" title="Copy to clipboard">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M11 5V3.5C11 2.67 10.33 2 9.5 2H3.5C2.67 2 2 2.67 2 3.5v6C2 10.33 2.67 11 3.5 11H5" stroke="currentColor" stroke-width="1.5"/></svg>
+              Copy
+            </button>
+            <button id="btn-download" class="btn btn-ghost btn-sm" title="Download this file">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l3-3m-3 3L5 7M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Download
+            </button>
+          </div>
+        </div>
+        <div class="preview-body">
+          <pre><code id="yaml-preview">---
+# Select a resource tab and fill in the details
+# YAML preview will update in real-time
+</code></pre>
+        </div>
+      </div>
+    </main>
+
+    <!-- Terminal Modal -->
+    <div class="modal-overlay" id="terminal-modal" style="display:none;">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="modal-title">kubectl apply</h3>
+          <button class="btn-icon modal-close" id="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="terminal" id="terminal-output">
+            <div class="terminal-line loading">
+              <span class="terminal-spinner">⠋</span> Running kubectl apply...
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="modal-status" id="modal-status"></div>
+          <button class="btn btn-ghost btn-sm" id="modal-copy-output">Copy Output</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

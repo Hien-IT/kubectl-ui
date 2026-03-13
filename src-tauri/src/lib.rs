@@ -1,0 +1,171 @@
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            apply_yaml,
+            save_and_apply_files,
+            get_kubectl_contexts,
+            switch_context,
+            get_current_context,
+            save_yaml_to_dir,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+use serde::Serialize;
+use std::collections::HashMap;
+use std::fs;
+use std::process::Command;
+
+#[derive(Serialize)]
+pub struct CmdResult {
+    pub success: bool,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Apply a single YAML string via kubectl apply
+#[tauri::command]
+fn apply_yaml(yaml: String, namespace: Option<String>) -> CmdResult {
+    let tmp_dir = std::env::temp_dir().join("kubectl-ui");
+    fs::create_dir_all(&tmp_dir).ok();
+    let tmp_file = tmp_dir.join("apply.yaml");
+    
+    if let Err(e) = fs::write(&tmp_file, &yaml) {
+        return CmdResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Failed to write temp file: {}", e),
+        };
+    }
+
+    let mut cmd = Command::new("kubectl");
+    cmd.arg("apply").arg("-f").arg(&tmp_file);
+    
+    if let Some(ns) = namespace {
+        if !ns.is_empty() {
+            cmd.arg("-n").arg(&ns);
+        }
+    }
+
+    run_command(&mut cmd)
+}
+
+/// Save multiple YAML files to a temp directory and apply them all
+#[tauri::command]
+fn save_and_apply_files(files: HashMap<String, String>, namespace: Option<String>) -> CmdResult {
+    let tmp_dir = std::env::temp_dir().join("kubectl-ui").join("manifests");
+    
+    // Clean and recreate
+    if tmp_dir.exists() {
+        fs::remove_dir_all(&tmp_dir).ok();
+    }
+    fs::create_dir_all(&tmp_dir).ok();
+
+    // Write each file
+    for (name, content) in &files {
+        let file_path = tmp_dir.join(name);
+        if let Err(e) = fs::write(&file_path, content) {
+            return CmdResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to write {}: {}", name, e),
+            };
+        }
+    }
+
+    // Apply the entire directory
+    let mut cmd = Command::new("kubectl");
+    cmd.arg("apply").arg("-f").arg(&tmp_dir);
+    
+    if let Some(ns) = namespace {
+        if !ns.is_empty() {
+            cmd.arg("-n").arg(&ns);
+        }
+    }
+
+    run_command(&mut cmd)
+}
+
+/// Save YAML files to a user-specified directory
+#[tauri::command]
+fn save_yaml_to_dir(dir: String, files: HashMap<String, String>) -> CmdResult {
+    let save_dir = std::path::PathBuf::from(&dir);
+    
+    if let Err(e) = fs::create_dir_all(&save_dir) {
+        return CmdResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Failed to create directory: {}", e),
+        };
+    }
+
+    let mut saved_files = Vec::new();
+    for (name, content) in &files {
+        let file_path = save_dir.join(name);
+        if let Err(e) = fs::write(&file_path, content) {
+            return CmdResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Failed to write {}: {}", name, e),
+            };
+        }
+        saved_files.push(name.clone());
+    }
+
+    CmdResult {
+        success: true,
+        stdout: format!("Saved {} files to {}:\n{}", saved_files.len(), dir, saved_files.join("\n")),
+        stderr: String::new(),
+    }
+}
+
+/// Get list of kubectl contexts
+#[tauri::command]
+fn get_kubectl_contexts() -> CmdResult {
+    let mut cmd = Command::new("kubectl");
+    cmd.arg("config").arg("get-contexts").arg("-o").arg("name");
+    run_command(&mut cmd)
+}
+
+/// Get current kubectl context
+#[tauri::command]
+fn get_current_context() -> CmdResult {
+    let mut cmd = Command::new("kubectl");
+    cmd.arg("config").arg("current-context");
+    run_command(&mut cmd)
+}
+
+/// Switch kubectl context
+#[tauri::command]
+fn switch_context(context: String) -> CmdResult {
+    let mut cmd = Command::new("kubectl");
+    cmd.arg("config").arg("use-context").arg(&context);
+    run_command(&mut cmd)
+}
+
+fn run_command(cmd: &mut Command) -> CmdResult {
+    match cmd.output() {
+        Ok(output) => CmdResult {
+            success: output.status.success(),
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        },
+        Err(e) => CmdResult {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Failed to execute command: {}", e),
+        },
+    }
+}
