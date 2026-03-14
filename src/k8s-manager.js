@@ -16,7 +16,7 @@ let colLockEnabled = (() => { try { return localStorage.getItem(COL_LOCK_KEY) !=
 
 // ===== Resource type metadata =====
 const RESOURCE_META = {
-  pods:                    { title:'Pods',            cols:['Name','Namespace','Status','Ready','Restarts','CPU','RAM','Age','Node'],   hasPodFeatures: true },
+  pods:                    { title:'Pods',            cols:['Name','Namespace','Status','Containers','Restarts','CPU/RAM','Age','Node'],   hasPodFeatures: true },
   deployments:             { title:'Deployments',     cols:['Name','Namespace','Ready','Up-to-date','Available','Age'],     scalable: true, restartable: true },
   statefulsets:            { title:'StatefulSets',    cols:['Name','Namespace','Ready','Age'],                              scalable: true, restartable: true },
   daemonsets:              { title:'DaemonSets',      cols:['Name','Namespace','Desired','Current','Ready','Age'],           restartable: true },
@@ -201,6 +201,7 @@ async function fetchResources() {
   // Lazy-load metrics for pods (non-blocking, updates cells in-place)
   if (currentResource === 'pods') {
     lazyLoadMetrics();
+    lazyLoadContainers();
   }
   
   if (currentResource === 'persistentvolumeclaims') {
@@ -299,8 +300,7 @@ async function lazyLoadMetrics() {
   const meta = RESOURCE_META['pods'];
   const order = getColOrder('pods', meta.cols);
   const orderedCols = order.map(i => meta.cols[i]);
-  const cpuVi = orderedCols.indexOf('CPU');
-  const ramVi = orderedCols.indexOf('RAM');
+  const cpuRamVi = orderedCols.indexOf('CPU/RAM');
 
   tbody.querySelectorAll('.k8s-row').forEach(row => {
     const idx = parseInt(row.dataset.idx);
@@ -312,9 +312,71 @@ async function lazyLoadMetrics() {
     const m = podMetrics[key] || { cpu: '-', ram: '-' };
 
     const cells = row.querySelectorAll('td');
-    if (cpuVi >= 0 && cells[cpuVi]) cells[cpuVi].innerHTML = metricBadge(m.cpu);
-    if (ramVi >= 0 && cells[ramVi]) cells[ramVi].innerHTML = metricBadge(m.ram);
+    if (cpuRamVi >= 0 && cells[cpuRamVi]) cells[cpuRamVi].innerHTML = `${metricBadge(m.cpu)} / ${metricBadge(m.ram)}`;
   });
+}
+
+async function lazyLoadContainers() {
+  if (!k8sInvoke) return;
+  const topArgs = ['get', 'pods', '-o', 'json'];
+  if (currentNs !== '--all--') topArgs.push('-n', currentNs);
+  else topArgs.push('-A');
+
+  const result = await k8sInvoke('run_kubectl', { args: topArgs, stdinInput: null });
+  if (!result?.success) return;
+
+  try {
+    const data = JSON.parse(result.stdout);
+    const containerStatusMap = {};
+
+    (data.items || []).forEach(pod => {
+      const ns = pod.metadata.namespace;
+      const name = pod.metadata.name;
+      const key = `${ns}/${name}`;
+      
+      const statuses = [];
+      const cStatuses = pod.status?.containerStatuses || [];
+      const initCStatuses = pod.status?.initContainerStatuses || [];
+      
+      // Combine all containers to display
+      const allStatuses = [...initCStatuses, ...cStatuses];
+      
+      allStatuses.forEach(cs => {
+        let state = 'waiting';
+        if (cs.state?.running) state = 'running';
+        else if (cs.state?.terminated) state = 'terminated';
+        
+        // Detailed tooltip message
+        let tooltip = `${cs.name} (${state})`;
+        if (cs.state?.terminated?.reason) tooltip += ` - ${cs.state.terminated.reason}`;
+        else if (cs.state?.waiting?.reason) tooltip += ` - ${cs.state.waiting.reason}`;
+        
+        statuses.push({ name: cs.name, state, tooltip });
+      });
+      
+      containerStatusMap[key] = statuses;
+    });
+
+    // Update table in place
+    document.querySelectorAll('.k8s-pod-containers-ph').forEach(el => {
+      const key = el.dataset.key;
+      const statuses = containerStatusMap[key];
+      
+      if (!statuses || statuses.length === 0) {
+        el.innerHTML = '-';
+        return;
+      }
+      
+      const html = `<div class="k8s-pod-containers-wrap">` + statuses.map(s => {
+        return `<span class="k8s-container-block ${s.state}" data-ktip="${escHtml(s.tooltip)}"></span>`;
+      }).join('') + `</div>`;
+      
+      el.outerHTML = html;
+    });
+
+  } catch(e) {
+    console.error("Failed to parse pods container statuses", e);
+  }
 }
 
 // ===== Column state (localStorage) =====
@@ -413,11 +475,11 @@ function renderTable(meta, items) {
         const age = cols[cols.length - 5] || '';
         if (currentNs === '--all--') {
           // -A: NAMESPACE NAME READY STATUS RESTARTS... AGE IP NODE NOMINATED READINESS
-          const podCols = [cols[1], cols[0], cols[3], cols[2], cols[4], m.cpu, m.ram, age, node];
+          const podCols = [cols[1], cols[0], cols[3], cols[2], cols[4], {cpu: m.cpu, ram: m.ram}, age, node];
           val = podCols[order[vi]] || '';
         } else {
           // single: NAME READY STATUS RESTARTS... AGE IP NODE NOMINATED READINESS
-          const podCols = [cols[0], currentNs, cols[2], cols[1], cols[3], m.cpu, m.ram, age, node];
+          const podCols = [cols[0], currentNs, cols[2], cols[1], cols[3], {cpu: m.cpu, ram: m.ram}, age, node];
           val = podCols[order[vi]] || '';
         }
       } else {
@@ -467,10 +529,17 @@ function renderTable(meta, items) {
         }
       }
 
+      // Placeholder for container badges
+      if (currentResource === 'pods' && colName === 'Containers') {
+        const podNs = currentNs === '--all--' ? cols[0] : currentNs;
+        const resolvedName = currentNs === '--all--' ? cols[1] : cols[0];
+        return `<td style="overflow: visible;"><span class="k8s-pod-containers-ph" data-key="${podNs}/${resolvedName}">Loading...</span></td>`;
+      }
+      
       // Status badge for pods
       if (currentResource === 'pods' && colName === 'Status') return `<td>${statusBadge(val)}</td>`;
-      // CPU/RAM metric badges
-      if (currentResource === 'pods' && (colName === 'CPU' || colName === 'RAM')) return `<td>${metricBadge(val)}</td>`;
+      // CPU/RAM metric badges (val is now an object {cpu, ram})
+      if (currentResource === 'pods' && colName === 'CPU/RAM') return `<td>${metricBadge(val?.cpu || '-')} / ${metricBadge(val?.ram || '-')}</td>`;
       // Status badge for PVCs
       if (currentResource === 'persistentvolumeclaims' && colName === 'Status') return `<td>${statusBadge(val)}</td>`;
       // Status badge for nodes

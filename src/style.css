@@ -2123,3 +2123,77 @@ select {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Container status colors for tabular view */
+.k8s-pod-containers-wrap {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.k8s-container-block {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  cursor: help;
+  position: relative;
+}
+
+.k8s-container-block.running {
+  background-color: var(--success);
+}
+
+.k8s-container-block.waiting {
+  background-color: var(--warning);
+}
+
+.k8s-container-block.terminated,
+.k8s-container-block.completed {
+  background-color: #6c757d; /* Gray for completed/stopped */
+}
+
+.k8s-pod-containers-ph {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.8em;
+}
+
+/* Custom Tooltip */
+.k8s-container-block[data-ktip]:hover::after {
+  content: attr(data-ktip);
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  opacity: 0;
+  animation: k8sTipFade 0.1s forwards;
+}
+
+.k8s-container-block[data-ktip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #1e293b;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  animation: k8sTipFade 0.1s forwards;
+}
+
+@keyframes k8sTipFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
