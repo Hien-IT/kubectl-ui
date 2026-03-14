@@ -195,7 +195,7 @@ async function fetchResources() {
 
   const lines = result.stdout.trim().split('\n').filter(Boolean);
   cachedItems = lines.map(line => line.split(/\s+/));
-  podMetrics = {}; // Reset metrics
+  // podMetrics and containerStatusMap are purposely not cleared here to prevent visual flashing/jank during refresh
   renderTable(meta, cachedItems);
 
   // Lazy-load metrics for pods (non-blocking, updates cells in-place)
@@ -279,21 +279,26 @@ async function lazyLoadPvcPods() {
 async function lazyLoadMetrics() {
   if (!k8sInvoke) return;
   const topArgs = ['top', 'pods', '--no-headers'];
-  if (currentNs === '--all--') topArgs.push('-A');
-  else topArgs.push('-n', currentNs);
+  if (currentNs !== '--all--') topArgs.push('-n', currentNs);
+  else topArgs.push('-A');
 
   const result = await k8sInvoke('run_kubectl', { args: topArgs, stdinInput: null });
   if (!result?.success) return;
 
-  podMetrics = {};
-  result.stdout.trim().split('\n').filter(Boolean).forEach(line => {
+  const lines = result.stdout.trim().split('\n').filter(Boolean);
+  const newMetrics = {};
+  
+  lines.forEach(line => {
     const parts = line.split(/\s+/);
     if (currentNs === '--all--' && parts.length >= 4) {
-      podMetrics[`${parts[0]}/${parts[1]}`] = { cpu: parts[2], ram: parts[3] };
+      newMetrics[`${parts[0]}/${parts[1]}`] = { cpu: parts[2], ram: parts[3] };
     } else if (parts.length >= 3) {
-      podMetrics[parts[0]] = { cpu: parts[1], ram: parts[2] };
+      newMetrics[parts[0]] = { cpu: parts[1], ram: parts[2] };
     }
   });
+
+  // Hot swap global cache
+  podMetrics = { ...podMetrics, ...newMetrics };
 
   // Update CPU/RAM cells in-place without re-rendering entire table
   const tbody = document.getElementById('k8s-table-body');
@@ -316,9 +321,15 @@ async function lazyLoadMetrics() {
   });
 }
 
+// Global cache to prevent visual flashing on auto-refresh
+let containerStatusMap = {};
+
 async function lazyLoadContainers() {
   if (!k8sInvoke) return;
-  const topArgs = ['get', 'pods', '-o', 'json'];
+  const topArgs = [
+    'get', 'pods', '-o',
+    'jsonpath={range .items[*]}{.metadata.namespace}{"\\t"}{.metadata.name}{"\\t"}{range .status.initContainerStatuses[*]}{"i:"}{.name}{","}{.state.running.startedAt}{","}{.state.terminated.reason}{","}{.state.waiting.reason}{"|"}{end}{range .status.containerStatuses[*]}{"c:"}{.name}{","}{.state.running.startedAt}{","}{.state.terminated.reason}{","}{.state.waiting.reason}{"|"}{end}{"\\n"}{end}'
+  ];
   if (currentNs !== '--all--') topArgs.push('-n', currentNs);
   else topArgs.push('-A');
 
@@ -326,53 +337,97 @@ async function lazyLoadContainers() {
   if (!result?.success) return;
 
   try {
-    const data = JSON.parse(result.stdout);
-    const containerStatusMap = {};
+    const rawOutput = result.stdout.trim();
+    if (!rawOutput) return;
 
-    (data.items || []).forEach(pod => {
-      const ns = pod.metadata.namespace;
-      const name = pod.metadata.name;
+    const newContainerStatusMap = {};
+    const lines = rawOutput.split('\n');
+
+    lines.forEach(line => {
+      const parts = line.split('\t');
+      if (parts.length < 3) return;
+      
+      const ns = parts[0];
+      const name = parts[1];
       const key = `${ns}/${name}`;
+      const statusesStr = parts[2];
       
       const statuses = [];
-      const cStatuses = pod.status?.containerStatuses || [];
-      const initCStatuses = pod.status?.initContainerStatuses || [];
-      
-      // Combine all containers to display
-      const allStatuses = [...initCStatuses, ...cStatuses];
-      
-      allStatuses.forEach(cs => {
-        let state = 'waiting';
-        if (cs.state?.running) state = 'running';
-        else if (cs.state?.terminated) state = 'terminated';
-        
-        // Detailed tooltip message
-        let tooltip = `${cs.name} (${state})`;
-        if (cs.state?.terminated?.reason) tooltip += ` - ${cs.state.terminated.reason}`;
-        else if (cs.state?.waiting?.reason) tooltip += ` - ${cs.state.waiting.reason}`;
-        
-        statuses.push({ name: cs.name, state, tooltip });
-      });
-      
-      containerStatusMap[key] = statuses;
-    });
-
-    // Update table in place
-    document.querySelectorAll('.k8s-pod-containers-ph').forEach(el => {
-      const key = el.dataset.key;
-      const statuses = containerStatusMap[key];
-      
-      if (!statuses || statuses.length === 0) {
-        el.innerHTML = '-';
-        return;
+      if (statusesStr) {
+        const blocks = statusesStr.split('|').filter(Boolean);
+        blocks.forEach(b => {
+          // format: type:name,runningTime,terminatedReason,waitingReason
+          // type is 'i' (init) or 'c' (normal)
+          const firstColon = b.indexOf(':');
+          if (firstColon === -1) return;
+          
+          const type = b.substring(0, firstColon);
+          const rest = b.substring(firstColon + 1);
+          const cols = rest.split(',');
+          
+          const cName = cols[0] || '';
+          const running = cols[1] || '';
+          const terminated = cols[2] || '';
+          const waiting = cols[3] || '';
+          
+          let state = 'waiting';
+          let reasonTooltip = '';
+          
+          if (running) {
+            state = 'running';
+          } else if (terminated) {
+            state = 'terminated';
+            reasonTooltip = ` - ${terminated}`;
+          } else {
+            state = 'waiting';
+            if (waiting) reasonTooltip = ` - ${waiting}`;
+          }
+          
+          const prefix = type === 'i' ? '(Init) ' : '';
+          const tooltip = `${prefix}${cName} (${state})${reasonTooltip}`;
+          statuses.push({ name: cName, state, tooltip });
+        });
       }
       
-      const html = `<div class="k8s-pod-containers-wrap">` + statuses.map(s => {
-        return `<span class="k8s-container-block ${s.state}" data-ktip="${escHtml(s.tooltip)}"></span>`;
-      }).join('') + `</div>`;
-      
-      el.outerHTML = html;
+      newContainerStatusMap[key] = statuses;
     });
+
+    containerStatusMap = { ...containerStatusMap, ...newContainerStatusMap };
+
+    containerStatusMap = { ...containerStatusMap, ...newContainerStatusMap };
+
+    // Batch DOM Updates to avoid freezing UI (especially with 200+ pods)
+    const tdElements = Array.from(document.querySelectorAll('.k8s-pod-containers-td'));
+    const BATCH_SIZE = 20;
+    
+    function processBatch(startIndex) {
+      const endIndex = Math.min(startIndex + BATCH_SIZE, tdElements.length);
+      
+      for (let i = startIndex; i < endIndex; i++) {
+        const td = tdElements[i];
+        const key = td.dataset.key;
+        const statuses = containerStatusMap[key];
+        
+        if (!statuses || statuses.length === 0) {
+          td.innerHTML = '-';
+          continue;
+        }
+        
+        const html = `<div class="k8s-pod-containers-wrap">` + statuses.map(s => {
+          return `<span class="k8s-container-block ${s.state}" data-ktip="${escHtml(s.tooltip)}"></span>`;
+        }).join('') + `</div>`;
+        
+        td.innerHTML = html;
+      }
+      
+      if (endIndex < tdElements.length) {
+        requestAnimationFrame(() => processBatch(endIndex));
+      }
+    }
+    
+    if (tdElements.length > 0) {
+      processBatch(0);
+    }
 
   } catch(e) {
     console.error("Failed to parse pods container statuses", e);
@@ -533,7 +588,7 @@ function renderTable(meta, items) {
       if (currentResource === 'pods' && colName === 'Containers') {
         const podNs = currentNs === '--all--' ? cols[0] : currentNs;
         const resolvedName = currentNs === '--all--' ? cols[1] : cols[0];
-        return `<td style="overflow: visible;"><span class="k8s-pod-containers-ph" data-key="${podNs}/${resolvedName}">Loading...</span></td>`;
+        return `<td class="k8s-pod-containers-td" data-key="${podNs}/${resolvedName}" style="overflow: visible;"><span class="k8s-pod-containers-ph">Loading...</span></td>`;
       }
       
       // Status badge for pods

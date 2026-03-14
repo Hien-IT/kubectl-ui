@@ -1352,7 +1352,7 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  /* Removed heavy box-shadow which can also drag down render performance during scroll */
 }
 
 .k8s-table th:active { cursor: grabbing; }
@@ -1395,7 +1395,8 @@ select {
 
 .k8s-row {
   cursor: pointer;
-  transition: var(--transition);
+  /* Removed transition: var(--transition) to prevent heavy repaints when scrolling over rows 
+     which causes jank on lists with >100 pods */
 }
 
 .k8s-row:hover {
