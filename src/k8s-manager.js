@@ -28,7 +28,7 @@ const RESOURCE_META = {
   configmaps:              { title:'ConfigMaps',      cols:['Name','Namespace','Data','Age'] },
   secrets:                 { title:'Secrets',         cols:['Name','Namespace','Type','Data','Age'] },
   hpa:                     { title:'HPA',             cols:['Name','Namespace','Reference','Targets','MinPods','MaxPods','Replicas','Age'] },
-  persistentvolumeclaims:  { title:'PVCs',            cols:['Name','Namespace','Status','Volume','Capacity','Access Modes','StorageClass','Age'] },
+  persistentvolumeclaims:  { title:'PVCs',            cols:['Name','Namespace','Status','Pods','Capacity','Access Modes','StorageClass','Age'] },
   nodes:                   { title:'Nodes',           cols:['Name','Status','Roles','Age','Version'],                       clusterScoped: true },
   namespaces:              { title:'Namespaces',      cols:['Name','Status','Age'],                                         clusterScoped: true },
 };
@@ -202,6 +202,71 @@ async function fetchResources() {
   if (currentResource === 'pods') {
     lazyLoadMetrics();
   }
+  
+  if (currentResource === 'persistentvolumeclaims') {
+    lazyLoadPvcPods();
+  }
+}
+
+let pvcToPodsMap = {};
+
+async function lazyLoadPvcPods() {
+  if (!k8sInvoke) return;
+  const topArgs = ['get', 'pods', '-A', '-o', 'json'];
+
+  const result = await k8sInvoke('run_kubectl', { args: topArgs, stdinInput: null });
+  if (!result?.success) return;
+
+  try {
+    const data = JSON.parse(result.stdout);
+    pvcToPodsMap = {};
+    if (data.items) {
+      data.items.forEach(pod => {
+        const podNs = pod.metadata.namespace;
+        const podName = pod.metadata.name;
+        if (pod.spec && pod.spec.volumes) {
+          pod.spec.volumes.forEach(vol => {
+            if (vol.persistentVolumeClaim) {
+              const claimName = vol.persistentVolumeClaim.claimName;
+              const key = `${podNs}/${claimName}`;
+              if (!pvcToPodsMap[key]) pvcToPodsMap[key] = [];
+              pvcToPodsMap[key].push(podName);
+            }
+          });
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Failed to parse pods JSON", e);
+    return;
+  }
+
+  // Update table in place
+  const tbody = document.getElementById('k8s-table-body');
+  const meta = RESOURCE_META['persistentvolumeclaims'];
+  const order = getColOrder('persistentvolumeclaims', meta.cols);
+  const orderedCols = order.map(i => meta.cols[i]);
+  const podsColVi = orderedCols.indexOf('Pods');
+
+  if (podsColVi >= 0) {
+    tbody.querySelectorAll('.k8s-row').forEach(row => {
+      const idx = parseInt(row.dataset.idx);
+      const cols = cachedItems[idx];
+      if (!cols) return;
+      
+      const pvcNs = currentNs === '--all--' ? cols[0] : currentNs;
+      const pvcName = currentNs === '--all--' ? cols[1] : cols[0];
+      const key = `${pvcNs}/${pvcName}`;
+      
+      const pods = pvcToPodsMap[key] || [];
+      const podsHtml = pods.length > 0 ? pods.join(', ') : '-';
+      
+      const cells = row.querySelectorAll('td');
+      if (cells[podsColVi]) {
+        cells[podsColVi].innerHTML = escHtml(podsHtml);
+      }
+    });
+  }
 }
 
 async function lazyLoadMetrics() {
@@ -327,7 +392,8 @@ function renderTable(meta, items) {
     return;
   }
 
-    // Body — map kubectl wide output columns to our display
+  // Body — map kubectl wide output columns to our display
+  tbody.innerHTML = items.map((cols, idx) => {
     const cells = orderedCols.map((colName, vi) => {
       let val = '';
       if (currentResource === 'pods') {
@@ -360,6 +426,41 @@ function renderTable(meta, items) {
           val = cols[origIdx] || '';
         }
       }
+      // Or show from cache if already loaded. Also handle shifted indexes for Capacity, Access Modes, Storageclass, Age
+      if (currentResource === 'persistentvolumeclaims') {
+        const pvcNs = currentNs === '--all--' ? cols[0] : currentNs;
+        const pvcName = currentNs === '--all--' ? cols[1] : cols[0];
+        const pvcKey = `${pvcNs}/${pvcName}`;
+        
+        // Find index of 'Pods' in the defined cols array for PVC (which replaced 'Volume')
+        const podsColIndex = meta.cols.indexOf('Pods');
+        
+        if (origIdx === podsColIndex) {
+          // This is the Pods column, replace with our custom data
+          if (pvcToPodsMap && pvcToPodsMap[pvcKey]) {
+             val = pvcToPodsMap[pvcKey].join(', ');
+          } else {
+             val = '-';
+          }
+        } else if (origIdx > podsColIndex) {
+           // Output format:
+           // -n: NAME STATUS VOLUME CAPACITY ACCESS_MODES STORAGECLASS AGE VOLUMEMODE
+           // -A: NAMESPACE NAME STATUS VOLUME CAPACITY ACCESS_MODES STORAGECLASS (7) AGE (8) VOLUMEMODE (9)
+           // If origIdx > podsColIndex, it means it's Capacity, Access Modes, StorageClass, or Age.
+           // Notice that "ACCESS_MODES" (e.g. RWO) is a single word without spaces.
+           // However "VolumeMode" is added at the end of kubectl output in modern k8s!
+           // This means our meta.cols length is shorter than kubectl output length.
+           // So for Age (the last column in our meta), we should fetch the second to last from kubectl cols
+           if (colName === 'Age') {
+             val = cols[cols.length - 2] || '';
+           } else {
+             // For Capacity (4), Access Modes (5), StorageClass (6)
+             // The offset matches since we skipped Pods (3) and want Volume (3) -> mapped 1:1 in index
+             val = cols[origIdx] || '';
+           }
+        }
+      }
+
       // Status badge for pods
       if (currentResource === 'pods' && colName === 'Status') return `<td>${statusBadge(val)}</td>`;
       // CPU/RAM metric badges
@@ -526,7 +627,7 @@ function initDetailPanel() {
         const isFollow = e.currentTarget.classList.contains('active');
         if (isFollow) {
           fetchLogs(); // immediate fetch
-          if (!logsPollTimer) logsPollTimer = setInterval(fetchLogs, 3000);
+          if (!logsPollTimer) logsPollTimer = setInterval(() => fetchLogs(true), 3000);
         } else {
           clearInterval(logsPollTimer);
           logsPollTimer = null;
@@ -814,7 +915,7 @@ async function loadBottomTab(tab) {
       const isFollow = document.getElementById('k8s-logs-follow-btn')?.classList.contains('active');
       fetchLogs();
       if (isFollow && !logsPollTimer) {
-        logsPollTimer = setInterval(fetchLogs, 3000);
+        logsPollTimer = setInterval(() => fetchLogs(true), 3000);
       }
       return;
     default:
@@ -1112,11 +1213,14 @@ async function loadPodContainers() {
   }
 }
 
-async function fetchLogs() {
+async function fetchLogs(isAutoRefresh = false) {
   if (!selectedItem || !k8sInvoke) return;
   const el = document.getElementById('k8s-detail-content');
-  el.textContent = 'Fetching logs...';
-  window._rawLogsContent = '';
+  
+  if (!isAutoRefresh) {
+    el.textContent = 'Fetching logs...';
+    window._rawLogsContent = '';
+  }
 
   const { name, namespace } = selectedItem;
   const container = document.getElementById('k8s-logs-container')?.value || '';
@@ -1137,6 +1241,12 @@ async function fetchLogs() {
 
   if (result?.success) {
     const logs = result.stdout || '(no logs)';
+    
+    // If it's an auto-refresh and the logs haven't changed, skip DOM updates entirely
+    if (isAutoRefresh && window._rawLogsContent === logs) {
+      return;
+    }
+    
     window._rawLogsContent = logs;
     
     // Check if user has scrolled up to prevent auto-scrolling if they are reading
