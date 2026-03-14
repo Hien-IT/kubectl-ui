@@ -776,45 +776,59 @@
 
             <!-- Bottom Panel: dynamic tabs (hidden by default) -->
             <div class="k8s-bottom-panel" id="k8s-bottom-panel" style="display:none;">
-              <div class="k8s-bottom-tabs" id="k8s-bottom-tabs">
-                <!-- Tabs generated dynamically by JS -->
-                <div class="k8s-bottom-tabs-right">
-                  <div class="k8s-yaml-actions" id="k8s-yaml-actions" style="display:none;">
-                    <!-- Removed old action buttons -->
-                  </div>
-                  <div class="k8s-logs-controls" id="k8s-logs-controls" style="display:none;">
-                    <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                      <select id="k8s-logs-container"><option value="">Container</option></select>
-                      <div class="k8s-logs-search">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                        <input type="text" id="k8s-logs-search-input" placeholder="Search in logs..." />
-                        <span class="k8s-logs-search-match" id="k8s-logs-search-count">0/0</span>
-                      </div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:4px;">
-                      <button class="k8s-log-action-btn" id="k8s-logs-follow-btn" title="Auto Refresh (Follow) Logs">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                      <button class="k8s-log-action-btn" id="k8s-logs-timestamps-btn" title="Show Timestamps">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                      <button class="k8s-log-action-btn" id="k8s-logs-previous-btn" title="Show Previous (Terminated)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                      <button class="k8s-log-action-btn active" id="k8s-logs-wrap-btn" title="Wrap Lines">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h12a4 4 0 010 8H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 17l-3 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                      <button class="k8s-log-action-btn" id="k8s-logs-download-btn" title="Download Logs">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                      <button class="k8s-log-action-btn" id="k8s-btn-fetch-logs" title="Refresh Logs" style="margin-left:4px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                  <button class="k8s-close-btn" id="k8s-btn-close-bottom" title="Close Bottom Panel" style="margin-left:8px;">
+              <div class="k8s-detail-resize-handle"></div>
+              
+              <!-- ROWS 1: TABS -->
+              <div class="k8s-bottom-tabs-wrapper" style="display:flex; justify-content:space-between; background:var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+                <div class="k8s-bottom-tabs" id="k8s-bottom-tabs" style="display: flex; flex:1; overflow-x: auto; border:none;">
+                  <!-- Tabs generated dynamically by JS -->
+                </div>
+                <div style="display:flex; align-items:center; padding: 0 12px; gap: 4px; border-bottom: 1px solid transparent;">
+                  <button class="k8s-action-icon-btn" id="k8s-btn-maximize-bottom" title="Maximize Panel">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14l8-8 8 8"/></svg>
+                  </button>
+                  <button class="k8s-close-btn" id="k8s-btn-close-bottom" title="Close Bottom Panel">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </button>
+                </div>
+              </div>
+
+              <!-- ROW 2: CONTROLS (Logs Toolbar) -->
+              <div class="k8s-bottom-toolbar" id="k8s-bottom-toolbar" style="display:none; background: #1e1e1e; padding: 6px 16px; border-bottom: 1px dotted rgba(255,255,255,0.1);">
+                <div class="k8s-yaml-actions" id="k8s-yaml-actions" style="display:none;"></div>
+                <div class="k8s-logs-controls" id="k8s-logs-controls" style="display:none; align-items:center; width:100%;">
+                  <div style="font-size: 0.8rem; color: var(--text-muted); margin-right: 12px; white-space: nowrap; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-3px; margin-right: 4px; flex-shrink: 0;"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span id="k8s-logs-tab-title">Logs</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                    <select id="k8s-logs-container" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; padding:4px 8px; font-size:0.8rem; min-width:140px;"><option value="">Container</option></select>
+                    <div class="k8s-logs-search" style="display:flex; align-items:center; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; padding:2px 8px; gap:6px;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                      <input type="text" id="k8s-logs-search-input" placeholder="Search in logs..." style="background:transparent; border:none; color:var(--text-primary); font-size:0.85rem; width:140px; outline:none;" />
+                      <span class="k8s-logs-search-match" id="k8s-logs-search-count" style="font-size:0.75rem; color:var(--text-muted);">0/0</span>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <button class="k8s-log-action-btn" id="k8s-logs-follow-btn" title="Auto Refresh (Follow) Logs" style="width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-log-action-btn" id="k8s-logs-timestamps-btn" title="Show Timestamps" style="width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-log-action-btn" id="k8s-logs-previous-btn" title="Show Previous (Terminated)" style="width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-log-action-btn active" id="k8s-logs-wrap-btn" title="Wrap Lines" style="width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h12a4 4 0 010 8H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 17l-3 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-log-action-btn" id="k8s-logs-download-btn" title="Download Logs" style="width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-log-action-btn" id="k8s-btn-fetch-logs" title="Refresh Logs" style="width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;margin-left:4px;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="k8s-bottom-body">

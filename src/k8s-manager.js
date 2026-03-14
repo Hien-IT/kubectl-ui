@@ -594,8 +594,8 @@ const TAB_LABELS = {
   logs: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Logs'
 };
 
-let openTabs = []; // Array of open tab types
-let activeBottomTab = null;
+let openTabs = []; // Array of tab objects: { id, type, resource, namespace, name, label }
+let activeBottomTabId = null;
 let logsPollTimer = null;
 let ansiUp = null;
 
@@ -608,12 +608,16 @@ function initDetailPanel() {
   document.getElementById('k8s-btn-close-bottom')?.addEventListener('click', closeBottomPanel);
 
   document.getElementById('k8s-btn-open-yaml')?.addEventListener('click', () => {
-    if (openTabs.includes('yaml')) switchBottomTab('yaml');
-    else addBottomTab('yaml');
+    if (!selectedItem) return;
+    const tabId = `yaml_${selectedItem.resource}_${selectedItem.namespace}_${selectedItem.name}`;
+    if (openTabs.find(t => t.id === tabId)) switchBottomTab(tabId);
+    else addBottomTab('yaml', selectedItem);
   });
   document.getElementById('k8s-logs-tab')?.addEventListener('click', () => {
-    if (openTabs.includes('logs')) switchBottomTab('logs');
-    else addBottomTab('logs');
+    if (!selectedItem) return;
+    const tabId = `logs_${selectedItem.resource}_${selectedItem.namespace}_${selectedItem.name}`;
+    if (openTabs.find(t => t.id === tabId)) switchBottomTab(tabId);
+    else addBottomTab('logs', selectedItem);
   });
 
   // Action buttons
@@ -688,76 +692,130 @@ function initDetailPanel() {
   setupDetailResize();
 }
 
-function addBottomTab(tabType) {
-  if (openTabs.includes(tabType)) { switchBottomTab(tabType); return; }
-  openTabs.push(tabType);
+function addBottomTab(tabType, itemContext) {
+  if (!itemContext) return;
+  const { resource, namespace, name } = itemContext;
+  const tabId = `${tabType}_${resource}_${namespace}_${name}`;
+  
+  if (openTabs.find(t => t.id === tabId)) { 
+    switchBottomTab(tabId); 
+    return; 
+  }
+
+  const kindName = resource.charAt(0).toUpperCase() + resource.slice(1).replace(/s$/, '');
+  const label = tabType === 'yaml' ? `YAML: ${name}` : `Logs: ${name}`;
+
+  openTabs.push({
+    id: tabId,
+    type: tabType,
+    resource: resource,
+    namespace: namespace,
+    name: name,
+    label: label
+  });
+
   renderBottomTabs();
-  switchBottomTab(tabType);
+  switchBottomTab(tabId);
   document.getElementById('k8s-bottom-panel').style.display = '';
-  // Highlight toolbar button
   updateOpenTabBtnStates();
 }
 
-function removeBottomTab(tabType) {
-  openTabs = openTabs.filter(t => t !== tabType);
-  if (tabType === 'yaml') resetYamlEditor();
+function removeBottomTab(tabId) {
+  const tabToRemove = openTabs.find(t => t.id === tabId);
+  if (!tabToRemove) return;
+
+  openTabs = openTabs.filter(t => t.id !== tabId);
+  if (tabToRemove.type === 'yaml' && activeBottomTabId === tabId) resetYamlEditor();
+  
   if (openTabs.length === 0) {
     document.getElementById('k8s-bottom-panel').style.display = 'none';
-    activeBottomTab = null;
+    activeBottomTabId = null;
   } else {
-    if (activeBottomTab === tabType) {
-      switchBottomTab(openTabs[openTabs.length - 1]);
+    if (activeBottomTabId === tabId) {
+      switchBottomTab(openTabs[openTabs.length - 1].id);
+    } else {
+      renderBottomTabs();
     }
-    renderBottomTabs();
   }
   updateOpenTabBtnStates();
 }
 
-function switchBottomTab(tabType) {
-  activeBottomTab = tabType;
+function switchBottomTab(tabId) {
+  activeBottomTabId = tabId;
+  const tab = openTabs.find(t => t.id === tabId);
+  if (!tab) return;
+
   renderBottomTabs();
-  document.getElementById('k8s-logs-controls').style.display = tabType === 'logs' ? 'flex' : 'none';
-  document.getElementById('k8s-yaml-actions').style.display = tabType === 'yaml' ? 'flex' : 'none';
-  if (tabType !== 'yaml') resetYamlEditor();
-  loadBottomTab(tabType);
+  
+  const isLogs = tab.type === 'logs';
+  const isYaml = tab.type === 'yaml';
+  
+  document.getElementById('k8s-logs-controls').style.display = isLogs ? 'flex' : 'none';
+  document.getElementById('k8s-yaml-actions').style.display = isYaml ? 'flex' : 'none';
+  
+  const toolbar = document.getElementById('k8s-bottom-toolbar');
+  if (toolbar) toolbar.style.display = (isLogs || isYaml) ? 'flex' : 'none';
+  
+  if (isLogs) {
+    const titleEl = document.getElementById('k8s-logs-tab-title');
+    if (titleEl) {
+      titleEl.innerHTML = `Displaying logs from Namespace: <span style="color:#6ab0f3;">${tab.namespace || 'default'}</span> for Pod: <span style="color:#6ab0f3;">${tab.name}</span>`;
+    }
+  }
+
+  if (!isYaml) resetYamlEditor();
+  loadBottomTab(tabId);
 }
 
 function renderBottomTabs() {
   const container = document.getElementById('k8s-bottom-tabs');
-  // Remove existing tab buttons (keep the tabs-right div)
-  const rightDiv = container.querySelector('.k8s-bottom-tabs-right');
-  container.querySelectorAll('.k8s-bottom-tab').forEach(el => el.remove());
+  container.innerHTML = '';
 
-  openTabs.forEach(tabType => {
+  openTabs.forEach(tab => {
     const btn = document.createElement('button');
-    btn.className = `k8s-bottom-tab${tabType === activeBottomTab ? ' active' : ''}`;
-    btn.dataset.btab = tabType;
-    btn.innerHTML = `${TAB_LABELS[tabType] || tabType} <span class="tab-close">×</span>`;
+    btn.className = `k8s-bottom-tab${tab.id === activeBottomTabId ? ' active' : ''}`;
+    btn.dataset.btab = tab.id;
+    btn.title = `${tab.resource}/${tab.namespace ? tab.namespace + '/' : ''}${tab.name}`;
+    const isYaml = tab.type === 'yaml';
+    const iconSvg = isYaml 
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      
+    btn.innerHTML = `${iconSvg} <span class="tab-text">${tab.resource === 'pods' ? 'Pod ' : ''}${tab.name}</span> <span class="tab-close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
     btn.addEventListener('click', (e) => {
       if (e.target.classList.contains('tab-close')) {
-        removeBottomTab(tabType);
+        removeBottomTab(tab.id);
       } else {
-        switchBottomTab(tabType);
+        switchBottomTab(tab.id);
       }
     });
 
-    container.insertBefore(btn, rightDiv);
+    container.appendChild(btn);
   });
 }
 
 function updateOpenTabBtnStates() {
-  const mapping = {
-    'yaml': 'k8s-btn-open-yaml',
-    'logs': 'k8s-logs-tab'
-  };
-  Object.entries(mapping).forEach(([tab, id]) => {
-    const btn = document.getElementById(id);
-    if (btn) {
-      if (openTabs.includes(tab)) btn.classList.add('opened');
-      else btn.classList.remove('opened');
-    }
-  });
+  if (!selectedItem) {
+    document.getElementById('k8s-btn-open-yaml')?.classList.remove('opened');
+    document.getElementById('k8s-logs-tab')?.classList.remove('opened');
+    return;
+  }
+  
+  const yamlTabId = `yaml_${selectedItem.resource}_${selectedItem.namespace}_${selectedItem.name}`;
+  const logsTabId = `logs_${selectedItem.resource}_${selectedItem.namespace}_${selectedItem.name}`;
+  
+  const btnYaml = document.getElementById('k8s-btn-open-yaml');
+  if (btnYaml) {
+    if (openTabs.find(t => t.id === yamlTabId)) btnYaml.classList.add('opened');
+    else btnYaml.classList.remove('opened');
+  }
+  
+  const btnLogs = document.getElementById('k8s-logs-tab');
+  if (btnLogs) {
+    if (openTabs.find(t => t.id === logsTabId)) btnLogs.classList.add('opened');
+    else btnLogs.classList.remove('opened');
+  }
 }
 
 function setupDetailResize() {
@@ -857,10 +915,8 @@ function openDetail(item) {
   // Load info in right panel only — bottom panel stays as-is
   loadInfoTab();
 
-  // If bottom panel is open, reload current tab for new item
-  if (activeBottomTab && openTabs.length > 0) {
-    loadBottomTab(activeBottomTab);
-  }
+  // If bottom panel is open, do not auto-reload bottom tab, keep user where they are
+  updateOpenTabBtnStates();
 
   if (meta.hasPodFeatures) loadPodContainers();
 }
@@ -876,7 +932,7 @@ function closeRightPanel() {
 function closeBottomPanel() {
   document.getElementById('k8s-bottom-panel').style.display = 'none';
   openTabs = [];
-  activeBottomTab = null;
+  activeBottomTabId = null;
   clearInterval(logsPollTimer);
   logsPollTimer = null;
   updateOpenTabBtnStates();
@@ -891,7 +947,7 @@ function closeAllPanels() {
   document.getElementById('k8s-detail').style.display = 'none';
   document.getElementById('k8s-bottom-panel').style.display = 'none';
   openTabs = [];
-  activeBottomTab = null;
+  activeBottomTabId = null;
   clearInterval(logsPollTimer);
   logsPollTimer = null;
   updateOpenTabBtnStates();
@@ -901,16 +957,18 @@ function closeAllPanels() {
 }
 
 // ===== Bottom panel tab content loading =====
-async function loadBottomTab(tab) {
-  if (!selectedItem || !k8sInvoke) return;
+async function loadBottomTab(tabId) {
+  const tab = openTabs.find(t => t.id === tabId);
+  if (!tab || !k8sInvoke) return;
+  
   const el = document.getElementById('k8s-detail-content');
   el.textContent = 'Loading...';
 
-  const { name, namespace, resource } = selectedItem;
+  const { name, namespace, resource, type } = tab;
   const nsArgs = namespace ? ['-n', namespace] : [];
   let args;
 
-  switch (tab) {
+  switch (type) {
     case 'yaml':
       args = ['get', resource, name, ...nsArgs, '-o', 'yaml'];
       break;
@@ -931,7 +989,7 @@ async function loadBottomTab(tab) {
   const result = await k8sInvoke('run_kubectl', { args, stdinInput: null });
   if (result?.success) {
     el.textContent = result.stdout || '(empty)';
-    if (tab === 'yaml') {
+    if (type === 'yaml') {
       setTimeout(() => handleEditYaml(), 50);
     }
   } else {
@@ -1216,11 +1274,19 @@ async function loadPodContainers() {
       if (i === 0) opt.selected = true;
       sel.appendChild(opt);
     });
+    
+    // Auto fetch logs for active tab if it's matching
+    if (activeBottomTabId && activeBottomTabId.includes(name)) {
+      const activeTab = openTabs.find(t => t.id === activeBottomTabId);
+      if (activeTab && activeTab.type === 'logs') fetchLogs();
+    }
   }
 }
 
 async function fetchLogs(isAutoRefresh = false) {
-  if (!selectedItem || !k8sInvoke) return;
+  const tab = openTabs.find(t => t.id === activeBottomTabId);
+  if (!tab || tab.type !== 'logs' || !k8sInvoke) return;
+  
   const el = document.getElementById('k8s-detail-content');
   
   if (!isAutoRefresh) {
@@ -1228,7 +1294,7 @@ async function fetchLogs(isAutoRefresh = false) {
     window._rawLogsContent = '';
   }
 
-  const { name, namespace } = selectedItem;
+  const { name, namespace } = tab;
   const container = document.getElementById('k8s-logs-container')?.value || '';
   const tail = '500'; // Default to 500 lines for better Lens-like experience
   const nsArgs = namespace ? ['-n', namespace] : [];
@@ -1293,6 +1359,9 @@ function resetYamlEditor() {
 }
 
 function handleEditYaml() {
+  const tab = openTabs.find(t => t.id === activeBottomTabId);
+  if (!tab || tab.type !== 'yaml') return;
+
   const content = document.getElementById('k8s-detail-content');
   const editorContainer = document.getElementById('k8s-yaml-editor-container');
   content.style.display = 'none';
@@ -1301,9 +1370,9 @@ function handleEditYaml() {
   editorContainer.style.height = '100%';
 
   // Subheader update
-  const kind = RESOURCE_META[currentResource]?.singleName || (currentResource.charAt(0).toUpperCase() + currentResource.slice(1, -1));
-  const name = selectedItem?.name || 'unknown';
-  const ns = selectedItem?.namespace || '';
+  const kind = RESOURCE_META[tab.resource]?.singleName || (tab.resource.charAt(0).toUpperCase() + tab.resource.slice(1, -1));
+  const name = tab.name || 'unknown';
+  const ns = tab.namespace || '';
   
   const kindEl = document.getElementById('k8s-yaml-kind');
   if (kindEl) kindEl.textContent = kind;
@@ -1346,7 +1415,7 @@ async function handleApplyYaml() {
     toast.textContent = result.stdout?.trim() || 'Applied successfully';
     toast.className = 'toast success show';
     resetYamlEditor();
-    loadBottomTab('yaml');
+    loadBottomTab(activeBottomTabId);
     fetchResources();
   } else {
     toast.textContent = result?.stderr || 'Apply failed';

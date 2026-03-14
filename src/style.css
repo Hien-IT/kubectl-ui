@@ -1514,55 +1514,69 @@ select {
 
 /* Open tab toolbar (removed) */
 
-/* Closeable bottom tab */
+/* Closeable bottom tab (Lens UI Style) */
 .k8s-bottom-tab {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px 4px 12px;
+  gap: 8px;
+  padding: 0 10px;
+  height: 36px;
   border: none;
+  border-right: 1px solid rgba(255,255,255,0.05);
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-sans);
-  font-size: 0.78rem;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 400;
+  border-radius: 0;
   cursor: pointer;
-  transition: var(--transition);
+  max-width: 250px;
+}
+
+.k8s-bottom-tab .tab-text {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .k8s-bottom-tab svg {
   flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .k8s-bottom-tab:hover {
+  background: rgba(255,255,255,0.03);
   color: var(--text-secondary);
-  background: rgba(99, 102, 241, 0.08);
 }
 
 .k8s-bottom-tab.active {
-  color: var(--text-accent);
-  background: rgba(99, 102, 241, 0.12);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-top: 2px solid var(--accent-primary);
 }
 
 .k8s-bottom-tab .tab-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  font-size: 11px;
-  line-height: 1;
-  opacity: 0.5;
-  transition: var(--transition);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  opacity: 0;
+  margin-left: 2px;
+}
+
+.k8s-bottom-tab:hover .tab-close,
+.k8s-bottom-tab.active .tab-close {
+  opacity: 0.6;
 }
 
 .k8s-bottom-tab .tab-close:hover {
   opacity: 1;
-  background: rgba(248, 113, 113, 0.2);
-  color: var(--danger);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 /* ===== Detail Header ===== */
@@ -1677,10 +1691,28 @@ select {
 .k8s-bottom-tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px 12px;
+  padding: 0;
+  background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.k8s-bottom-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.k8s-bottom-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.k8s-bottom-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.k8s-bottom-tabs::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .k8s-bottom-tabs-right {
