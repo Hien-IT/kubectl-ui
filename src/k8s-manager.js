@@ -1,5 +1,6 @@
 // ===== K8s Resource Manager =====
 // Lens-like resource browser, detail viewer, logs, and actions
+import { createEditor, setEditorValue, getEditorValue, disposeEditor, focusEditor } from './yaml-editor.js';
 
 let k8sInvoke = null;
 let currentResource = 'pods';
@@ -407,28 +408,98 @@ function statusBadge(status) {
 }
 
 // ===== Detail Panel =====
+const TAB_LABELS = { yaml: '📄 YAML', describe: '📋 Describe', events: '⚡ Events', logs: '📜 Logs' };
+let openTabs = []; // Array of open tab types
+let activeBottomTab = null;
+
 function initDetailPanel() {
   document.getElementById('k8s-btn-close-detail')?.addEventListener('click', closeDetail);
 
-  // Detail tab navigation
-  document.querySelectorAll('.k8s-detail-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.k8s-detail-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const dtab = tab.dataset.dtab;
-      document.getElementById('k8s-logs-controls').style.display = dtab === 'logs' ? 'flex' : 'none';
-      loadDetailTab(dtab);
+  // Open-tab toolbar buttons
+  document.querySelectorAll('.k8s-open-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabType = btn.dataset.openTab;
+      if (openTabs.includes(tabType)) {
+        switchBottomTab(tabType);
+      } else {
+        addBottomTab(tabType);
+      }
     });
   });
 
-  // Delete button
+  // Action buttons
   document.getElementById('k8s-btn-delete')?.addEventListener('click', handleDelete);
   document.getElementById('k8s-btn-restart')?.addEventListener('click', handleRestart);
   document.getElementById('k8s-btn-scale')?.addEventListener('click', handleScale);
   document.getElementById('k8s-btn-fetch-logs')?.addEventListener('click', fetchLogs);
+  document.getElementById('k8s-btn-goto-deploy')?.addEventListener('click', handleGotoDeploy);
+  document.getElementById('k8s-btn-edit-yaml')?.addEventListener('click', handleEditYaml);
+  document.getElementById('k8s-btn-apply-yaml')?.addEventListener('click', handleApplyYaml);
+  document.getElementById('k8s-btn-cancel-edit')?.addEventListener('click', handleCancelEdit);
+}
 
-  // Detail panel resize handle
-  setupDetailResize();
+function addBottomTab(tabType) {
+  if (openTabs.includes(tabType)) { switchBottomTab(tabType); return; }
+  openTabs.push(tabType);
+  renderBottomTabs();
+  switchBottomTab(tabType);
+  document.getElementById('k8s-bottom-panel').style.display = '';
+  // Highlight toolbar button
+  updateOpenTabBtnStates();
+}
+
+function removeBottomTab(tabType) {
+  openTabs = openTabs.filter(t => t !== tabType);
+  if (tabType === 'yaml') resetYamlEditor();
+  if (openTabs.length === 0) {
+    document.getElementById('k8s-bottom-panel').style.display = 'none';
+    activeBottomTab = null;
+  } else {
+    if (activeBottomTab === tabType) {
+      switchBottomTab(openTabs[openTabs.length - 1]);
+    }
+    renderBottomTabs();
+  }
+  updateOpenTabBtnStates();
+}
+
+function switchBottomTab(tabType) {
+  activeBottomTab = tabType;
+  renderBottomTabs();
+  document.getElementById('k8s-logs-controls').style.display = tabType === 'logs' ? 'flex' : 'none';
+  document.getElementById('k8s-yaml-actions').style.display = tabType === 'yaml' ? 'flex' : 'none';
+  if (tabType !== 'yaml') resetYamlEditor();
+  loadBottomTab(tabType);
+}
+
+function renderBottomTabs() {
+  const container = document.getElementById('k8s-bottom-tabs');
+  // Remove existing tab buttons (keep the tabs-right div)
+  const rightDiv = container.querySelector('.k8s-bottom-tabs-right');
+  container.querySelectorAll('.k8s-bottom-tab').forEach(el => el.remove());
+
+  openTabs.forEach(tabType => {
+    const btn = document.createElement('button');
+    btn.className = `k8s-bottom-tab${tabType === activeBottomTab ? ' active' : ''}`;
+    btn.dataset.btab = tabType;
+    btn.innerHTML = `${TAB_LABELS[tabType] || tabType} <span class="tab-close">×</span>`;
+
+    btn.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) {
+        removeBottomTab(tabType);
+      } else {
+        switchBottomTab(tabType);
+      }
+    });
+
+    container.insertBefore(btn, rightDiv);
+  });
+}
+
+function updateOpenTabBtnStates() {
+  document.querySelectorAll('.k8s-open-tab-btn').forEach(btn => {
+    btn.classList.toggle('opened', openTabs.includes(btn.dataset.openTab));
+  });
 }
 
 function setupDetailResize() {
@@ -470,42 +541,46 @@ function setupDetailResize() {
 
 function openDetail(item) {
   const meta = RESOURCE_META[currentResource];
-  // For -A output: col[0]=NAMESPACE, col[1]=NAME. For single ns: col[0]=NAME
   const name = (!meta.clusterScoped && currentNs === '--all--') ? item[1] : item[0];
   const ns = meta.clusterScoped ? '' : (currentNs === '--all--' ? item[0] : currentNs);
 
   selectedItem = { name, namespace: ns, resource: currentResource };
 
+  // Show right panel with info
   document.getElementById('k8s-detail').style.display = '';
   document.getElementById('k8s-detail-badge').textContent = currentResource.toUpperCase().replace(/S$/, '');
   document.getElementById('k8s-detail-name').textContent = name;
   document.getElementById('k8s-detail-ns').textContent = ns ? `ns: ${ns}` : 'cluster-scoped';
 
-  // Show/hide action buttons based on resource type
+  // Show/hide action buttons
   document.getElementById('k8s-btn-restart').style.display = meta.restartable ? '' : 'none';
   document.getElementById('k8s-btn-scale').style.display = meta.scalable ? '' : 'none';
-
-  // Show logs tab only for pods
+  document.getElementById('k8s-btn-goto-deploy').style.display = (currentResource === 'pods') ? '' : 'none';
   document.getElementById('k8s-logs-tab').style.display = meta.hasPodFeatures ? '' : 'none';
 
-  // Reset to YAML tab
-  document.querySelectorAll('.k8s-detail-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.k8s-detail-tab[data-dtab="yaml"]').classList.add('active');
-  document.getElementById('k8s-logs-controls').style.display = 'none';
+  // Load info in right panel only — bottom panel stays as-is
+  loadInfoTab();
 
-  loadDetailTab('yaml');
+  // If bottom panel is open, reload current tab for new item
+  if (activeBottomTab && openTabs.length > 0) {
+    loadBottomTab(activeBottomTab);
+  }
 
-  // If pods, populate container dropdown
   if (meta.hasPodFeatures) loadPodContainers();
 }
 
 function closeDetail() {
   document.getElementById('k8s-detail').style.display = 'none';
+  document.getElementById('k8s-bottom-panel').style.display = 'none';
+  openTabs = [];
+  activeBottomTab = null;
+  updateOpenTabBtnStates();
+  resetYamlEditor();
   selectedItem = null;
 }
 
-// ===== Detail tab content loading =====
-async function loadDetailTab(tab) {
+// ===== Bottom panel tab content loading =====
+async function loadBottomTab(tab) {
   if (!selectedItem || !k8sInvoke) return;
   const el = document.getElementById('k8s-detail-content');
   el.textContent = 'Loading...';
@@ -537,6 +612,187 @@ async function loadDetailTab(tab) {
   } else {
     el.textContent = result?.stderr || 'Failed to fetch data';
   }
+}
+
+// ===== Lens-like Info tab =====
+async function loadInfoTab() {
+  if (!selectedItem || !k8sInvoke) return;
+  const el = document.getElementById('k8s-detail-info-body');
+  el.innerHTML = '<span class="k8s-loading-spinner"></span> Loading info...';
+
+  const { name, namespace, resource } = selectedItem;
+  const nsArgs = namespace ? ['-n', namespace] : [];
+
+  const result = await k8sInvoke('run_kubectl', {
+    args: ['get', resource, name, ...nsArgs, '-o', 'json'],
+    stdinInput: null
+  });
+
+  if (!result?.success) {
+    el.textContent = result?.stderr || 'Failed to fetch info';
+    return;
+  }
+
+  let obj;
+  try { obj = JSON.parse(result.stdout); } catch { el.textContent = 'Invalid JSON'; return; }
+
+  const meta = obj.metadata || {};
+  const spec = obj.spec || {};
+  const status = obj.status || {};
+
+  let html = '<div class="k8s-info-panel">';
+
+  // ===== Properties Section =====
+  html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Properties</div>';
+  html += infoRow('Created', meta.creationTimestamp ? timeAgo(meta.creationTimestamp) + ` (${meta.creationTimestamp})` : '-');
+  html += infoRow('Name', meta.name || '-');
+  if (meta.namespace) html += infoRow('Namespace', meta.namespace);
+
+  // Labels
+  if (meta.labels && Object.keys(meta.labels).length) {
+    html += infoRow('Labels', Object.entries(meta.labels).map(([k,v]) => `<span class="k8s-info-badge">${k}: ${v}</span>`).join(' '));
+  }
+
+  // Annotations count
+  if (meta.annotations) {
+    html += infoRow('Annotations', `${Object.keys(meta.annotations).length} Annotations`);
+  }
+
+  // Owner references
+  if (meta.ownerReferences?.length) {
+    const owner = meta.ownerReferences[0];
+    html += infoRow('Controlled By', `${owner.kind} <span class="k8s-info-link">${owner.name}</span>`);
+  }
+
+  // Resource-specific properties
+  if (resource === 'pods') {
+    html += infoRow('Status', `<span class="k8s-status k8s-status-${(status.phase||'').toLowerCase()}">${status.phase || '-'}</span>`);
+    html += infoRow('Node', status.hostIP ? `<span class="k8s-info-link">${spec.nodeName || '-'}</span>` : '-');
+    html += infoRow('Pod IP', status.podIP || '-');
+    if (status.podIPs?.length > 1) html += infoRow('Pod IPs', status.podIPs.map(p => p.ip).join(', '));
+    html += infoRow('Service Account', spec.serviceAccountName || '-');
+    html += infoRow('QoS Class', status.qosClass || '-');
+    html += infoRow('Restart Policy', spec.restartPolicy || '-');
+    if (spec.nodeSelector) {
+      html += infoRow('Node Selector', Object.entries(spec.nodeSelector).map(([k,v]) => `${k}: ${v}`).join(', '));
+    }
+    html += infoRow('DNS Policy', spec.dnsPolicy || '-');
+  }
+
+  if (resource === 'deployments' || resource === 'statefulsets') {
+    html += infoRow('Replicas', `${status.readyReplicas || 0}/${spec.replicas || 0} ready`);
+    html += infoRow('Strategy', spec.strategy?.type || spec.updateStrategy?.type || '-');
+    if (spec.selector?.matchLabels) {
+      html += infoRow('Selector', Object.entries(spec.selector.matchLabels).map(([k,v]) => `<span class="k8s-info-badge">${k}: ${v}</span>`).join(' '));
+    }
+  }
+
+  if (resource === 'services') {
+    html += infoRow('Type', spec.type || '-');
+    html += infoRow('Cluster IP', spec.clusterIP || '-');
+    if (spec.externalIPs?.length) html += infoRow('External IPs', spec.externalIPs.join(', '));
+    if (spec.ports?.length) {
+      html += infoRow('Ports', spec.ports.map(p => `${p.port}${p.targetPort ? '→' + p.targetPort : ''}/${p.protocol || 'TCP'}`).join(', '));
+    }
+    if (spec.selector) {
+      html += infoRow('Selector', Object.entries(spec.selector).map(([k,v]) => `<span class="k8s-info-badge">${k}: ${v}</span>`).join(' '));
+    }
+  }
+
+  html += '</div>';
+
+  // ===== Conditions Section =====
+  if (status.conditions?.length) {
+    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Conditions</div>';
+    html += '<div class="k8s-info-conditions">';
+    status.conditions.forEach(c => {
+      const ok = c.status === 'True';
+      html += `<span class="k8s-info-condition ${ok ? 'ok' : 'fail'}">${c.type}</span>`;
+    });
+    html += '</div></div>';
+  }
+
+  // ===== Containers Section =====
+  const containers = spec.containers || (spec.template?.spec?.containers) || [];
+  if (containers.length) {
+    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Containers</div>';
+    containers.forEach(c => {
+      html += `<div class="k8s-info-container">`;
+      html += `<div class="k8s-info-container-name">🟢 ${c.name}</div>`;
+      html += infoRow('Image', c.image || '-');
+      if (c.ports?.length) {
+        html += infoRow('Ports', c.ports.map(p => `${p.containerPort}/${p.protocol || 'TCP'}`).join(', '));
+      }
+      if (c.resources) {
+        const req = c.resources.requests || {};
+        const lim = c.resources.limits || {};
+        if (Object.keys(req).length) html += infoRow('Requests', Object.entries(req).map(([k,v]) => `${k}: ${v}`).join(', '));
+        if (Object.keys(lim).length) html += infoRow('Limits', Object.entries(lim).map(([k,v]) => `${k}: ${v}`).join(', '));
+      }
+      if (c.env?.length) {
+        html += infoRow('Env', `${c.env.length} variables`);
+      }
+      if (c.volumeMounts?.length) {
+        html += infoRow('Mounts', c.volumeMounts.map(m => `${m.name} → ${m.mountPath}`).join('<br>'));
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Container statuses (for pods)
+  if (status.containerStatuses?.length) {
+    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Container Status</div>';
+    status.containerStatuses.forEach(cs => {
+      const state = Object.keys(cs.state || {})[0] || 'unknown';
+      html += `<div class="k8s-info-container">`;
+      html += `<div class="k8s-info-container-name">${state === 'running' ? '🟢' : state === 'waiting' ? '🟡' : '🔴'} ${cs.name}</div>`;
+      html += infoRow('State', state);
+      html += infoRow('Ready', cs.ready ? '✅ Yes' : '❌ No');
+      html += infoRow('Restarts', `${cs.restartCount || 0}`);
+      html += infoRow('Image', cs.image || '-');
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ===== Volumes Section =====
+  const volumes = spec.volumes || (spec.template?.spec?.volumes) || [];
+  if (volumes.length) {
+    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Volumes</div>';
+    volumes.forEach(v => {
+      const type = Object.keys(v).filter(k => k !== 'name')[0] || 'unknown';
+      html += infoRow(v.name, `<span class="k8s-info-badge">${type}</span>`);
+    });
+    html += '</div>';
+  }
+
+  // ===== Tolerations =====
+  const tolerations = spec.tolerations || (spec.template?.spec?.tolerations) || [];
+  if (tolerations.length) {
+    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Tolerations</div>';
+    tolerations.forEach(t => {
+      html += infoRow(t.key || '*', `${t.operator || 'Equal'} ${t.value || ''} (${t.effect || 'all'})`);
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function infoRow(label, value) {
+  return `<div class="k8s-info-row"><span class="k8s-info-label">${label}</span><span class="k8s-info-value">${value}</span></div>`;
+}
+
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  if (days > 0) return `${days}d ${hours}h ago`;
+  if (hours > 0) return `${hours}h ${mins}m ago`;
+  return `${mins}m ago`;
 }
 
 // ===== Pod-specific features =====
@@ -596,6 +852,144 @@ async function fetchLogs() {
   } else {
     el.textContent = result?.stderr || 'Failed to fetch logs';
   }
+}
+
+// ===== YAML Edit & Apply =====
+let monacoReady = false;
+
+function resetYamlEditor() {
+  document.getElementById('k8s-yaml-editor').style.display = 'none';
+  document.getElementById('k8s-detail-content').style.display = '';
+  document.getElementById('k8s-btn-edit-yaml').style.display = '';
+  document.getElementById('k8s-btn-apply-yaml').style.display = 'none';
+  document.getElementById('k8s-btn-cancel-edit').style.display = 'none';
+}
+
+function handleEditYaml() {
+  const content = document.getElementById('k8s-detail-content');
+  const editorContainer = document.getElementById('k8s-yaml-editor');
+  content.style.display = 'none';
+  editorContainer.style.display = '';
+  document.getElementById('k8s-btn-edit-yaml').style.display = 'none';
+  document.getElementById('k8s-btn-apply-yaml').style.display = '';
+  document.getElementById('k8s-btn-cancel-edit').style.display = '';
+
+  if (!monacoReady) {
+    createEditor(editorContainer);
+    monacoReady = true;
+  }
+  setEditorValue(content.textContent);
+  focusEditor();
+}
+
+function handleCancelEdit() {
+  resetYamlEditor();
+}
+
+async function handleApplyYaml() {
+  if (!k8sInvoke) return;
+  const yaml = getEditorValue();
+
+  const toast = document.getElementById('toast');
+  toast.textContent = 'Applying YAML...';
+  toast.className = 'toast show';
+
+  const result = await k8sInvoke('run_kubectl', { args: ['apply', '-f', '-'], stdinInput: yaml });
+
+  if (result?.success) {
+    toast.textContent = result.stdout?.trim() || 'Applied successfully';
+    toast.className = 'toast success show';
+    resetYamlEditor();
+    loadBottomTab('yaml');
+    fetchResources();
+  } else {
+    toast.textContent = result?.stderr || 'Apply failed';
+    toast.className = 'toast error show';
+  }
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ===== Go to Owner =====
+const KIND_TO_RESOURCE = {
+  Deployment: 'deployments',
+  StatefulSet: 'statefulsets',
+  DaemonSet: 'daemonsets',
+  ReplicaSet: 'replicasets',
+  Job: 'jobs',
+  CronJob: 'cronjobs',
+};
+
+async function handleGotoDeploy() {
+  if (!selectedItem || !k8sInvoke) return;
+  const { name, namespace } = selectedItem;
+
+  const toast = document.getElementById('toast');
+  toast.textContent = 'Finding owner...';
+  toast.className = 'toast show';
+
+  // Get pod's owner references
+  const nsArgs = namespace ? ['-n', namespace] : [];
+  const result = await k8sInvoke('run_kubectl', {
+    args: ['get', 'pod', name, ...nsArgs, '-o', 'jsonpath={.metadata.ownerReferences[0].kind}/{.metadata.ownerReferences[0].name}'],
+    stdinInput: null
+  });
+
+  if (!result?.success || !result.stdout.includes('/')) {
+    toast.textContent = 'No owner found';
+    toast.className = 'toast error show';
+    setTimeout(() => toast.classList.remove('show'), 2500);
+    return;
+  }
+
+  let [ownerKind, ownerName] = result.stdout.split('/');
+
+  // If owned by ReplicaSet, try to find Deployment parent
+  if (ownerKind === 'ReplicaSet') {
+    const rsResult = await k8sInvoke('run_kubectl', {
+      args: ['get', 'rs', ownerName, ...nsArgs, '-o', 'jsonpath={.metadata.ownerReferences[0].kind}/{.metadata.ownerReferences[0].name}'],
+      stdinInput: null
+    });
+    if (rsResult?.success && rsResult.stdout.includes('/')) {
+      const [rsOwnerKind, rsOwnerName] = rsResult.stdout.split('/');
+      if (KIND_TO_RESOURCE[rsOwnerKind]) {
+        ownerKind = rsOwnerKind;
+        ownerName = rsOwnerName;
+      }
+    }
+  }
+
+  toast.classList.remove('show');
+
+  const resourceType = KIND_TO_RESOURCE[ownerKind];
+  if (!resourceType || !RESOURCE_META[resourceType]) {
+    toast.textContent = `Owner: ${ownerKind}/${ownerName} (unsupported view)`;
+    toast.className = 'toast show';
+    setTimeout(() => toast.classList.remove('show'), 3000);
+    return;
+  }
+
+  // Switch to owner resource view
+  currentResource = resourceType;
+  document.querySelectorAll('.k8s-nav-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.resource === resourceType);
+  });
+  showLoading();
+  await fetchResources();
+
+  // Open detail for this owner
+  const meta = RESOURCE_META[resourceType];
+  selectedItem = { name: ownerName, namespace, resource: resourceType };
+  document.getElementById('k8s-detail').style.display = '';
+  document.getElementById('k8s-detail-badge').textContent = ownerKind.toUpperCase();
+  document.getElementById('k8s-detail-name').textContent = ownerName;
+  document.getElementById('k8s-detail-ns').textContent = namespace ? `ns: ${namespace}` : 'cluster-scoped';
+  document.getElementById('k8s-btn-restart').style.display = meta.restartable ? '' : 'none';
+  document.getElementById('k8s-btn-scale').style.display = meta.scalable ? '' : 'none';
+  document.getElementById('k8s-btn-goto-deploy').style.display = 'none';
+  document.getElementById('k8s-logs-tab').style.display = meta.hasPodFeatures ? '' : 'none';
+
+  loadInfoTab();
+  addBottomTab('yaml');
 }
 
 // ===== Actions =====
