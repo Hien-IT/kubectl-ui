@@ -1325,13 +1325,18 @@ select {
 .k8s-table {
   width: 100%;
   min-width: 900px;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9rem; /* Increased to match Lens */
 }
 
-.k8s-table th {
+.k8s-table thead {
   position: sticky;
   top: 0;
+  z-index: 10;
+}
+
+.k8s-table th {
   background: var(--bg-secondary);
   padding: 10px 12px;
   text-align: left;
@@ -1341,7 +1346,7 @@ select {
   /* text-transform removed to match Lens */
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--border-color);
-  z-index: 5;
+  border-top: 1px solid transparent; /* Keeps align */
   cursor: grab;
   user-select: none;
   overflow: hidden;
