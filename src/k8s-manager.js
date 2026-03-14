@@ -327,38 +327,39 @@ function renderTable(meta, items) {
     return;
   }
 
-  // Body — map kubectl wide output columns to our display
-  tbody.innerHTML = items.map((cols, idx) => {
-    // For pods, inject CPU/RAM from metrics between col index 4 (Restarts) and 5 (Age)
-    // kubectl get pods -o wide cols: NAME READY STATUS RESTARTS AGE IP NODE ...
-    // With -A: NAMESPACE NAME READY STATUS RESTARTS AGE IP NODE ...
-    let displayCols;
-    if (currentResource === 'pods') {
-      const podName = cols[0];
-      const podNs = currentNs === '--all--' ? cols[0] : currentNs;
-      const resolvedName = currentNs === '--all--' ? cols[1] : cols[0];
-      const key = currentNs === '--all--' ? `${podNs}/${resolvedName}` : resolvedName;
-      const m = podMetrics[key] || { cpu: '-', ram: '-' };
-      // kubectl -o wide columns can shift when RESTARTS contains spaces like "4 (4d9h ago)"
-      // Use end-relative indexing: ..., AGE, IP, NODE, NOMINATED, READINESS
-      // NODE = cols[len-3], AGE = cols[len-5]
-      const node = cols[cols.length - 3] || '';
-      const age = cols[cols.length - 5] || '';
-      // Our cols: Name, Namespace, Status, Ready, Restarts, CPU, RAM, Age, Node
-      if (currentNs === '--all--') {
-        // -A: NAMESPACE NAME READY STATUS RESTARTS... AGE IP NODE NOMINATED READINESS
-        displayCols = [cols[1], cols[0], cols[3], cols[2], cols[4], m.cpu, m.ram, age, node];
-      } else {
-        // single: NAME READY STATUS RESTARTS... AGE IP NODE NOMINATED READINESS
-        displayCols = [cols[0], currentNs, cols[2], cols[1], cols[3], m.cpu, m.ram, age, node];
-      }
-    } else {
-      displayCols = cols;
-    }
-
+    // Body — map kubectl wide output columns to our display
     const cells = orderedCols.map((colName, vi) => {
-      const origIdx = order[vi];
-      const val = displayCols[origIdx] || '';
+      let val = '';
+      if (currentResource === 'pods') {
+        const podName = cols[0];
+        const podNs = currentNs === '--all--' ? cols[0] : currentNs;
+        const resolvedName = currentNs === '--all--' ? cols[1] : cols[0];
+        const key = currentNs === '--all--' ? `${podNs}/${resolvedName}` : resolvedName;
+        const m = podMetrics[key] || { cpu: '-', ram: '-' };
+        const node = cols[cols.length - 3] || '';
+        const age = cols[cols.length - 5] || '';
+        if (currentNs === '--all--') {
+          // -A: NAMESPACE NAME READY STATUS RESTARTS... AGE IP NODE NOMINATED READINESS
+          const podCols = [cols[1], cols[0], cols[3], cols[2], cols[4], m.cpu, m.ram, age, node];
+          val = podCols[order[vi]] || '';
+        } else {
+          // single: NAME READY STATUS RESTARTS... AGE IP NODE NOMINATED READINESS
+          const podCols = [cols[0], currentNs, cols[2], cols[1], cols[3], m.cpu, m.ram, age, node];
+          val = podCols[order[vi]] || '';
+        }
+      } else {
+        // Other resources mapping
+        // kubectl get -A usually returns: NAMESPACE, NAME, ...
+        // We want display: NAME, NAMESPACE, ...
+        const origIdx = order[vi];
+        if (currentNs === '--all--' && meta.cols[1] === 'Namespace') {
+          if (origIdx === 0) val = cols[1]; // Name
+          else if (origIdx === 1) val = cols[0]; // Namespace
+          else val = cols[origIdx] || '';
+        } else {
+          val = cols[origIdx] || '';
+        }
+      }
       // Status badge for pods
       if (currentResource === 'pods' && colName === 'Status') return `<td>${statusBadge(val)}</td>`;
       // CPU/RAM metric badges

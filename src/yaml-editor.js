@@ -22,59 +22,65 @@ monaco.languages.register({ id: 'yaml' });
 monaco.languages.setMonarchTokensProvider('yaml', {
   tokenizer: {
     root: [
-      // Comments
-      [/#.*$/, 'comment'],
-      // Keys
-      [/^[\w][\w.\-]*(?=\s*:)/, 'type'],
-      [/^\s+[\w][\w.\-]*(?=\s*:)/, 'type'],
-      // Strings
-      [/"[^"]*"/, 'string'],
-      [/'[^']*'/, 'string'],
-      // Booleans
-      [/\b(true|false|yes|no|on|off)\b/i, 'keyword'],
-      // Null
+      // Keys (with or without quotes)
+      [/(?:^|\s+)(?:[a-zA-Z0-9_\-\.]+)(?=\s*:)/, 'type'],
+      [/"([^"\\]|\\.)*"(?=\s*:)/, 'type'],
+      [/'([^'\\]|\\.)*'(?=\s*:)/, 'type'],
+      // Unquoted Date/Time & IPs
+      [/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[A-Za-z0-9\+\-\:.]*/, 'string.unquoted'],
+      [/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b/, 'string.unquoted'],
+      // Strings (Quoted) -> Orange/Brown
+      [/"([^"\\]|\\.)*"/, 'string.quote'],
+      [/'([^'\\]|\\.)*'/, 'string.quote'],
+      // Identify block strings indicators -> Blue
+      [/(\|\-?|\>\-?)\s*$/, 'string.unquoted'],
+      // Booleans -> Purple
+      [/\b(true|false)\b/i, 'keyword'],
+      // Null -> Purple
       [/\b(null|~)\b/i, 'keyword'],
-      // Numbers
+      // Numbers -> Orange/Yellow
       [/\b\d+(\.\d+)?\b/, 'number'],
       // YAML directives
       [/^---/, 'tag'],
       [/^\.\.\./, 'tag'],
       // Anchors & Aliases
       [/[&*]\w+/, 'tag'],
-      // Tags
-      [/!\w+/, 'tag'],
-      // List markers
+      // List markers -> Gray
       [/^\s*-\s/, 'operator'],
+      // Unquoted strings (catch all) -> Blue
+      [/(?<=:\s+)[^#\n"'\{\[\>\|]+$/, 'string.unquoted'],
     ]
   }
 });
 
-// Define K8s YAML dark theme (VS Code Default Dark+)
+// Define K8s YAML dark theme (Lens Dark Theme)
 monaco.editor.defineTheme('k8s-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [
-    { token: 'type', foreground: '9CDCFE' },      // Keys - light blue
-    { token: 'string', foreground: 'CE9178' },     // Strings - orange
-    { token: 'keyword', foreground: '569CD6' },    // Booleans - blue
-    { token: 'number', foreground: 'B5CEA8' },     // Numbers - light green
-    { token: 'comment', foreground: '6A9955' },    // Comments - green
-    { token: 'tag', foreground: '569CD6' },        // Tags - blue
-    { token: 'operator', foreground: 'D4D4D4' },   // List markers - default
+    { token: 'type', foreground: '56B6C2' },       // Keys - cyan/teal
+    { token: 'string', foreground: '56B6C2' },     // Strings - cyan
+    { token: 'string.quote', foreground: '56B6C2' }, // Quoted Strings - cyan
+    { token: 'string.unquoted', foreground: '56B6C2' }, // Unquoted Strings - cyan
+    { token: 'keyword', foreground: 'D19A66' },    // Booleans/Null - orange
+    { token: 'number', foreground: 'D19A66' },     // Numbers - orange
+    { token: 'comment', foreground: '5C6370', fontStyle: 'italic' }, // Comments - gray
+    { token: 'tag', foreground: 'E06C75' },        // Tags - red
+    { token: 'operator', foreground: 'ABB2BF' },   // List markers - default text color
   ],
   colors: {
-    'editor.background': '#1E1E1E',
-    'editor.foreground': '#D4D4D4',
-    'editorLineNumber.foreground': '#858585',
-    'editorLineNumber.activeForeground': '#C6C6C6',
-    'editor.selectionBackground': '#264F78',
-    'editor.lineHighlightBackground': '#2A2D2E',
-    'editorCursor.foreground': '#AEAFAD',
-    'editorWidget.background': '#252526',
-    'editorWidget.border': '#454545',
-    'editorSuggestWidget.background': '#252526',
-    'editorSuggestWidget.border': '#454545',
-    'editorSuggestWidget.selectedBackground': '#062F4A',
+    'editor.background': '#1E1E1E',                // Keep VS Code dark background for consistency with the rest of the UI
+    'editor.foreground': '#ABB2BF',
+    'editorLineNumber.foreground': '#4B5263',
+    'editorLineNumber.activeForeground': '#ABB2BF',
+    'editor.selectionBackground': '#3E4451',
+    'editor.lineHighlightBackground': '#2C313A',
+    'editorCursor.foreground': '#528BFF',
+    'editorWidget.background': '#21252B',
+    'editorWidget.border': '#181A1F',
+    'editorSuggestWidget.background': '#21252B',
+    'editorSuggestWidget.border': '#181A1F',
+    'editorSuggestWidget.selectedBackground': '#2C313A',
   }
 });
 
