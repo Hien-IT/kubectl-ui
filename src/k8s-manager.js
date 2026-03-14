@@ -10,6 +10,9 @@ let autoRefreshTimer = null;
 let cachedItems = [];
 let columnState = {}; // { resourceType: { order: [...], widths: {...} } }
 const DETAIL_HEIGHT_KEY = 'k8s-detail-height';
+const DETAIL_WIDTH_KEY = 'k8s-detail-width';
+const COL_LOCK_KEY = 'k8s-col-lock';
+let colLockEnabled = (() => { try { return localStorage.getItem(COL_LOCK_KEY) !== 'false'; } catch { return true; } })();
 
 // ===== Resource type metadata =====
 const RESOURCE_META = {
@@ -58,6 +61,21 @@ export function activateK8sPage() {
   }, 16);
 }
 
+// Called when context is switched — reload namespaces + resources
+export function reloadK8sOnContextSwitch() {
+  if (!k8sInvoke) return;
+  closeDetail();
+  nsLoaded = false;
+  currentNs = '--all--';
+  const sel = document.getElementById('k8s-ns-filter');
+  if (sel) sel.value = '--all--';
+  showLoading();
+  setTimeout(() => {
+    loadK8sNamespaces(true);
+    fetchResources();
+  }, 16);
+}
+
 // ===== Resource type sidebar navigation =====
 function initResourceNav() {
   document.querySelectorAll('.k8s-nav-item').forEach(btn => {
@@ -93,12 +111,42 @@ function initToolbar() {
       autoRefreshTimer = null;
     }
   });
+
+  // Column lock toggle
+  const lockBtn = document.getElementById('k8s-col-lock-toggle');
+  if (lockBtn) {
+    // Restore saved state on init
+    lockBtn.classList.toggle('active', colLockEnabled);
+    updateLockIcon(lockBtn, colLockEnabled);
+
+    lockBtn.addEventListener('click', () => {
+      colLockEnabled = !colLockEnabled;
+      try { localStorage.setItem(COL_LOCK_KEY, colLockEnabled); } catch {}
+      lockBtn.classList.toggle('active', colLockEnabled);
+      lockBtn.title = colLockEnabled ? 'Column widths locked (fixed table)' : 'Column widths unlocked (scrollable)';
+      updateLockIcon(lockBtn, colLockEnabled);
+      // Re-render table with new layout mode
+      if (cachedItems && cachedItems.length) {
+        const meta = RESOURCE_META[currentResource];
+        if (meta) renderTable(meta, cachedItems);
+      }
+    });
+  }
+}
+
+function updateLockIcon(btn, locked) {
+  if (locked) {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  }
 }
 
 // ===== Load namespace filter =====
 let nsLoaded = false;
-export async function loadK8sNamespaces() {
-  if (!k8sInvoke || nsLoaded) return;
+export async function loadK8sNamespaces(force = false) {
+  if (!k8sInvoke) return;
+  if (!force && nsLoaded) return;
   const result = await k8sInvoke('run_kubectl', { args: ['get', 'ns', '-o', 'jsonpath={.items[*].metadata.name}'], stdinInput: null });
   if (!result?.success) return;
   nsLoaded = true;
@@ -248,14 +296,26 @@ function renderTable(meta, items) {
   const widths = getColWidths(currentResource);
   const orderedCols = order.map(i => meta.cols[i]);
 
-  // Set table to fixed layout for column widths
+  // Table layout
   table.style.tableLayout = 'fixed';
+  table.style.width = '100%';
+  table.style.minWidth = '';
 
   // Header with resize handles + drag attributes
   thead.innerHTML = '<tr>' + orderedCols.map((c, vi) => {
     const w = widths[c] ? `width:${widths[c]}px;` : '';
     return `<th draggable="true" data-col-idx="${order[vi]}" data-col-name="${c}" style="${w}position:relative;">${c}<span class="k8s-col-resize" data-vi="${vi}"></span></th>`;
   }).join('') + '</tr>';
+
+  // When unlocked: after browser paints, freeze all column pixel widths
+  // then switch table to auto width so it can grow beyond container
+  if (!colLockEnabled) {
+    requestAnimationFrame(() => {
+      const ths = thead.querySelectorAll('th');
+      ths.forEach(t => { t.style.width = t.offsetWidth + 'px'; });
+      table.style.width = 'max-content';
+    });
+  }
 
   // Setup drag-to-reorder on headers
   setupColumnDragReorder(thead, order, meta);
@@ -314,12 +374,15 @@ function renderTable(meta, items) {
     return `<tr class="k8s-row" data-idx="${idx}">${cells}</tr>`;
   }).join('');
 
-  // Row click → open detail
+  // Row click → open detail + highlight
   tbody.querySelectorAll('.k8s-row').forEach(row => {
     row.addEventListener('click', () => {
       const idx = parseInt(row.dataset.idx);
       const item = cachedItems[idx];
       if (!item) return;
+      // Highlight selected row
+      tbody.querySelectorAll('.k8s-row.selected').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
       openDetail(item);
     });
   });
@@ -408,7 +471,12 @@ function statusBadge(status) {
 }
 
 // ===== Detail Panel =====
-const TAB_LABELS = { yaml: '📄 YAML', describe: '📋 Describe', events: '⚡ Events', logs: '📜 Logs' };
+const TAB_LABELS = {
+  yaml: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> YAML',
+  describe: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="9" y="2" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/></svg> Describe',
+  events: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Events',
+  logs: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Logs'
+};
 let openTabs = []; // Array of open tab types
 let activeBottomTab = null;
 
@@ -432,10 +500,12 @@ function initDetailPanel() {
   document.getElementById('k8s-btn-restart')?.addEventListener('click', handleRestart);
   document.getElementById('k8s-btn-scale')?.addEventListener('click', handleScale);
   document.getElementById('k8s-btn-fetch-logs')?.addEventListener('click', fetchLogs);
-  document.getElementById('k8s-btn-goto-deploy')?.addEventListener('click', handleGotoDeploy);
   document.getElementById('k8s-btn-edit-yaml')?.addEventListener('click', handleEditYaml);
   document.getElementById('k8s-btn-apply-yaml')?.addEventListener('click', handleApplyYaml);
   document.getElementById('k8s-btn-cancel-edit')?.addEventListener('click', handleCancelEdit);
+
+  // Setup resize handles for right panel
+  setupDetailResize();
 }
 
 function addBottomTab(tabType) {
@@ -506,7 +576,7 @@ function setupDetailResize() {
   const detail = document.getElementById('k8s-detail');
   if (!detail) return;
 
-  // Insert resize handle at top of detail panel
+  // ----- Vertical resize handle (for bottom panel height) -----
   const handle = document.createElement('div');
   handle.className = 'k8s-detail-resize-handle';
   detail.prepend(handle);
@@ -523,7 +593,6 @@ function setupDetailResize() {
     const startH = detail.offsetHeight;
 
     const onMouseMove = (ev) => {
-      // Dragging up → increase height
       const newH = Math.max(150, Math.min(window.innerHeight * 0.8, startH - (ev.clientY - startY)));
       detail.style.height = newH + 'px';
       detail.style.maxHeight = 'none';
@@ -532,7 +601,43 @@ function setupDetailResize() {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
       const finalH = Math.max(150, Math.min(window.innerHeight * 0.8, startH - (ev.clientY - startY)));
-      try { localStorage.setItem(DETAIL_HEIGHT_KEY, finalH); } catch {}
+      try { localStorage.setItem(DETAIL_HEIGHT_KEY, finalH); } catch {};
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+
+  // ----- Horizontal resize handle (for panel width) -----
+  const hHandle = document.createElement('div');
+  hHandle.className = 'k8s-detail-resize-h';
+  detail.prepend(hHandle);
+
+  // Restore saved width
+  try {
+    const savedW = localStorage.getItem(DETAIL_WIDTH_KEY);
+    if (savedW) {
+      detail.style.width = savedW + 'px';
+      detail.style.maxWidth = 'none';
+    }
+  } catch {}
+
+  hHandle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = detail.offsetWidth;
+
+    const onMouseMove = (ev) => {
+      // Dragging left → increase width
+      const newW = Math.max(280, Math.min(window.innerWidth * 0.6, startW - (ev.clientX - startX)));
+      detail.style.width = newW + 'px';
+      detail.style.maxWidth = 'none';
+    };
+    const onMouseUp = (ev) => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      const finalW = Math.max(280, Math.min(window.innerWidth * 0.6, startW - (ev.clientX - startX)));
+      try { localStorage.setItem(DETAIL_WIDTH_KEY, finalW); } catch {}
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -555,7 +660,6 @@ function openDetail(item) {
   // Show/hide action buttons
   document.getElementById('k8s-btn-restart').style.display = meta.restartable ? '' : 'none';
   document.getElementById('k8s-btn-scale').style.display = meta.scalable ? '' : 'none';
-  document.getElementById('k8s-btn-goto-deploy').style.display = (currentResource === 'pods') ? '' : 'none';
   document.getElementById('k8s-logs-tab').style.display = meta.hasPodFeatures ? '' : 'none';
 
   // Load info in right panel only — bottom panel stays as-is
@@ -577,6 +681,8 @@ function closeDetail() {
   updateOpenTabBtnStates();
   resetYamlEditor();
   selectedItem = null;
+  // Clear row highlight
+  document.querySelectorAll('.k8s-row.selected').forEach(r => r.classList.remove('selected'));
 }
 
 // ===== Bottom panel tab content loading =====
@@ -658,16 +764,16 @@ async function loadInfoTab() {
     html += infoRow('Annotations', `${Object.keys(meta.annotations).length} Annotations`);
   }
 
-  // Owner references
+  // Owner references — clickable link to navigate
   if (meta.ownerReferences?.length) {
     const owner = meta.ownerReferences[0];
-    html += infoRow('Controlled By', `${owner.kind} <span class="k8s-info-link">${owner.name}</span>`);
+    html += infoRow('Controlled By', `${owner.kind} <span class="k8s-info-link k8s-owner-link" data-owner-kind="${owner.kind}" data-owner-name="${owner.name}">${owner.name}</span>`);
   }
 
   // Resource-specific properties
   if (resource === 'pods') {
     html += infoRow('Status', `<span class="k8s-status k8s-status-${(status.phase||'').toLowerCase()}">${status.phase || '-'}</span>`);
-    html += infoRow('Node', status.hostIP ? `<span class="k8s-info-link">${spec.nodeName || '-'}</span>` : '-');
+    html += infoRow('Node', spec.nodeName ? `<span class="k8s-info-link k8s-node-link" data-node-name="${spec.nodeName}">${spec.nodeName}</span>` : '-');
     html += infoRow('Pod IP', status.podIP || '-');
     if (status.podIPs?.length > 1) html += infoRow('Pod IPs', status.podIPs.map(p => p.ip).join(', '));
     html += infoRow('Service Account', spec.serviceAccountName || '-');
@@ -779,6 +885,29 @@ async function loadInfoTab() {
 
   html += '</div>';
   el.innerHTML = html;
+
+  // Attach click handler to owner link
+  el.querySelectorAll('.k8s-owner-link').forEach(link => {
+    link.addEventListener('click', () => {
+      const kind = link.dataset.ownerKind;
+      const ownerName = link.dataset.ownerName;
+      if (kind && ownerName) {
+        navigateToOwner(kind, ownerName, selectedItem?.namespace);
+      }
+    });
+    link.style.cursor = 'pointer';
+  });
+
+  // Attach click handler to node link
+  el.querySelectorAll('.k8s-node-link').forEach(link => {
+    link.addEventListener('click', () => {
+      const nodeName = link.dataset.nodeName;
+      if (nodeName) {
+        navigateToOwner('Node', nodeName, '');
+      }
+    });
+    link.style.cursor = 'pointer';
+  });
 }
 
 function infoRow(label, value) {
@@ -917,6 +1046,7 @@ const KIND_TO_RESOURCE = {
   ReplicaSet: 'replicasets',
   Job: 'jobs',
   CronJob: 'cronjobs',
+  Node: 'nodes',
 };
 
 async function handleGotoDeploy() {
@@ -959,37 +1089,32 @@ async function handleGotoDeploy() {
   }
 
   toast.classList.remove('show');
+  navigateToOwner(ownerKind, ownerName, namespace);
+}
 
+async function navigateToOwner(ownerKind, ownerName, namespace) {
   const resourceType = KIND_TO_RESOURCE[ownerKind];
-  if (!resourceType || !RESOURCE_META[resourceType]) {
-    toast.textContent = `Owner: ${ownerKind}/${ownerName} (unsupported view)`;
-    toast.className = 'toast show';
-    setTimeout(() => toast.classList.remove('show'), 3000);
-    return;
-  }
 
-  // Switch to owner resource view
-  currentResource = resourceType;
-  document.querySelectorAll('.k8s-nav-item').forEach(b => {
-    b.classList.toggle('active', b.dataset.resource === resourceType);
-  });
-  showLoading();
-  await fetchResources();
-
-  // Open detail for this owner
-  const meta = RESOURCE_META[resourceType];
-  selectedItem = { name: ownerName, namespace, resource: resourceType };
+  // Update right panel to show owner info (don't change left table)
+  selectedItem = { name: ownerName, namespace, resource: resourceType || ownerKind.toLowerCase() + 's' };
   document.getElementById('k8s-detail').style.display = '';
   document.getElementById('k8s-detail-badge').textContent = ownerKind.toUpperCase();
   document.getElementById('k8s-detail-name').textContent = ownerName;
   document.getElementById('k8s-detail-ns').textContent = namespace ? `ns: ${namespace}` : 'cluster-scoped';
-  document.getElementById('k8s-btn-restart').style.display = meta.restartable ? '' : 'none';
-  document.getElementById('k8s-btn-scale').style.display = meta.scalable ? '' : 'none';
-  document.getElementById('k8s-btn-goto-deploy').style.display = 'none';
-  document.getElementById('k8s-logs-tab').style.display = meta.hasPodFeatures ? '' : 'none';
 
+  // Update action button visibility based on owner's resource meta
+  const meta = resourceType ? RESOURCE_META[resourceType] : null;
+  document.getElementById('k8s-btn-restart').style.display = meta?.restartable ? '' : 'none';
+  document.getElementById('k8s-btn-scale').style.display = meta?.scalable ? '' : 'none';
+  document.getElementById('k8s-logs-tab').style.display = meta?.hasPodFeatures ? '' : 'none';
+
+  // Reload info tab for owner
   loadInfoTab();
-  addBottomTab('yaml');
+
+  // If bottom panel tabs are open, reload for new item
+  if (activeBottomTab && openTabs.length > 0) {
+    loadBottomTab(activeBottomTab);
+  }
 }
 
 // ===== Actions =====
@@ -1071,7 +1196,43 @@ async function handleRestart() {
 async function handleScale() {
   if (!selectedItem || !k8sInvoke) return;
   const { name, namespace, resource } = selectedItem;
-  const replicas = prompt(`Scale ${name} to how many replicas?`, '1');
+
+  // Show scale modal
+  const modal = document.getElementById('scale-modal');
+  const input = document.getElementById('scale-modal-input');
+  const title = document.getElementById('scale-modal-title');
+  title.textContent = `Scale ${name}`;
+  input.value = '1';
+  modal.style.display = '';
+  input.focus();
+  input.select();
+
+  // Wait for user action
+  const replicas = await new Promise(resolve => {
+    const confirmBtn = document.getElementById('scale-modal-confirm');
+    const cancelBtn = document.getElementById('scale-modal-cancel');
+    const closeBtn = document.getElementById('scale-modal-close');
+
+    function cleanup() {
+      modal.style.display = 'none';
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      closeBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKeydown);
+    }
+    function onConfirm() { cleanup(); resolve(input.value); }
+    function onCancel() { cleanup(); resolve(null); }
+    function onKeydown(e) {
+      if (e.key === 'Enter') { onConfirm(); }
+      if (e.key === 'Escape') { onCancel(); }
+    }
+
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    closeBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKeydown);
+  });
+
   if (replicas === null) return;
   const num = parseInt(replicas);
   if (isNaN(num) || num < 0) return;

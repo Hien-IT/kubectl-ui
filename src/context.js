@@ -50,6 +50,11 @@ export function initContextSwitcher() {
         }
         // Reload YAML namespace dropdown
         loadYamlNamespaces();
+        // Reload K8s Manager namespaces + resources
+        try {
+          const k8s = await import('./k8s-manager.js');
+          k8s.reloadK8sOnContextSwitch();
+        } catch {}
       } else {
         showToast(`Failed: ${result.stderr}`, 'error');
         statusEl.classList.add('error');
