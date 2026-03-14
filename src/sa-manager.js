@@ -11,11 +11,12 @@ export function initSAManager(invoke) {
   initSAButtons();
 }
 
-export function reloadAllNamespaces() {
-  loadNamespaces('sa-create-ns');
-  loadNamespaces('sa-delete-ns');
-  loadNamespaces('sa-update-ns');
-  loadNamespaces('sa-export-ns');
+export async function reloadAllNamespaces() {
+  await fetchNamespacesOnce();
+  populateNamespaceDropdown('sa-create-ns');
+  populateNamespaceDropdown('sa-delete-ns');
+  populateNamespaceDropdown('sa-update-ns');
+  populateNamespaceDropdown('sa-export-ns');
 }
 
 // ===== Sidebar Navigation =====
@@ -27,12 +28,9 @@ function initSidebar() {
       const page = btn.dataset.page;
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById(`page-${page}`)?.classList.add('active');
-      // Auto-load all namespace dropdowns when entering SA Manager
+      // Auto-load all namespace dropdowns when entering SA Manager (single fetch)
       if (page === 'sa-manager') {
-        loadNamespaces('sa-create-ns');
-        loadNamespaces('sa-delete-ns');
-        loadNamespaces('sa-update-ns');
-        loadNamespaces('sa-export-ns');
+        reloadAllNamespaces();
       }
     });
   });
@@ -147,17 +145,19 @@ async function kubectlSilent(args) {
   } catch { return null; }
 }
 
-// ===== Load Namespaces into dropdown =====
-async function loadNamespaces(selectId) {
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
+// ===== Load Namespaces (single fetch, populate many) =====
+async function fetchNamespacesOnce() {
   const result = await kubectlSilent(['get', 'ns', '-o', 'jsonpath={.items[*].metadata.name}']);
   if (!result?.success) return;
-  const nsList = result.stdout.trim().split(/\s+/).filter(Boolean);
-  cachedNamespaces = nsList;
+  cachedNamespaces = result.stdout.trim().split(/\s+/).filter(Boolean);
+}
+
+function populateNamespaceDropdown(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
   const current = sel.value;
   sel.innerHTML = '<option value="">-- Chọn Namespace --</option>';
-  nsList.forEach(ns => {
+  cachedNamespaces.forEach(ns => {
     const opt = document.createElement('option');
     opt.value = ns; opt.textContent = ns;
     if (ns === current) opt.selected = true;
