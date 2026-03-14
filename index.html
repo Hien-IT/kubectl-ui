@@ -721,10 +721,13 @@
                 <button class="btn btn-ghost btn-sm" id="k8s-btn-refresh" title="Refresh">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
-                <label class="k8s-auto-refresh">
-                  <input type="checkbox" id="k8s-auto-refresh-toggle" checked />
-                  <span>Auto 5s</span>
-                </label>
+                <select id="k8s-auto-refresh-toggle" class="app-input app-input-sm" style="width: auto; height: 26px; padding: 0 4px; font-size: 12px;">
+                  <option value="0">Auto: Off</option>
+                  <option value="5000" selected>Auto: 5s</option>
+                  <option value="10000">Auto: 10s</option>
+                  <option value="30000">Auto: 30s</option>
+                  <option value="60000">Auto: 60s</option>
+                </select>
               </div>
             </div>
 

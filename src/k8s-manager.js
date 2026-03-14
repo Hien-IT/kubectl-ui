@@ -54,9 +54,10 @@ export function activateK8sPage() {
   setTimeout(() => {
     loadK8sNamespaces();
     fetchResources();
-    // Start auto-refresh if checkbox is checked (default: on)
-    if (!autoRefreshTimer && document.getElementById('k8s-auto-refresh-toggle')?.checked) {
-      autoRefreshTimer = setInterval(fetchResources, 5000);
+    // Start auto-refresh if dropdown is not off (default: 5000)
+    const refreshDropdown = document.getElementById('k8s-auto-refresh-toggle');
+    if (!autoRefreshTimer && refreshDropdown && refreshDropdown.value !== "0") {
+      autoRefreshTimer = setInterval(fetchResources, parseInt(refreshDropdown.value));
     }
   }, 16);
 }
@@ -104,11 +105,15 @@ function initToolbar() {
   });
 
   document.getElementById('k8s-auto-refresh-toggle')?.addEventListener('change', (e) => {
-    if (e.target.checked) {
-      autoRefreshTimer = setInterval(fetchResources, 5000);
-    } else {
+    // Clear old timer first
+    if (autoRefreshTimer) {
       clearInterval(autoRefreshTimer);
       autoRefreshTimer = null;
+    }
+    
+    const val = parseInt(e.target.value);
+    if (val > 0) {
+      autoRefreshTimer = setInterval(fetchResources, val);
     }
   });
 
@@ -343,90 +348,106 @@ async function lazyLoadContainers() {
     const newContainerStatusMap = {};
     const lines = rawOutput.split('\n');
 
-    lines.forEach(line => {
-      const parts = line.split('\t');
-      if (parts.length < 3) return;
-      
-      const ns = parts[0];
-      const name = parts[1];
-      const key = `${ns}/${name}`;
-      const statusesStr = parts[2];
-      
-      const statuses = [];
-      if (statusesStr) {
-        const blocks = statusesStr.split('|').filter(Boolean);
-        blocks.forEach(b => {
-          // format: type:name,runningTime,terminatedReason,waitingReason
-          // type is 'i' (init) or 'c' (normal)
-          const firstColon = b.indexOf(':');
-          if (firstColon === -1) return;
+    // Process raw lines in chunks to yield thread to browser rendering / scrolling
+    const PROCESS_BATCH_SIZE = 50;
+    
+    function processLinesBatch(startIndex) {
+      return new Promise(resolve => {
+        const endIndex = Math.min(startIndex + PROCESS_BATCH_SIZE, lines.length);
+        for (let i = startIndex; i < endIndex; i++) {
+          const line = lines[i];
+          const parts = line.split('\t');
+          if (parts.length < 3) continue;
           
-          const type = b.substring(0, firstColon);
-          const rest = b.substring(firstColon + 1);
-          const cols = rest.split(',');
+          const ns = parts[0];
+          const name = parts[1];
+          const key = `${ns}/${name}`;
+          const statusesStr = parts[2];
           
-          const cName = cols[0] || '';
-          const running = cols[1] || '';
-          const terminated = cols[2] || '';
-          const waiting = cols[3] || '';
-          
-          let state = 'waiting';
-          let reasonTooltip = '';
-          
-          if (running) {
-            state = 'running';
-          } else if (terminated) {
-            state = 'terminated';
-            reasonTooltip = ` - ${terminated}`;
-          } else {
-            state = 'waiting';
-            if (waiting) reasonTooltip = ` - ${waiting}`;
+          const statuses = [];
+          if (statusesStr) {
+            const blocks = statusesStr.split('|').filter(Boolean);
+            blocks.forEach(b => {
+              const firstColon = b.indexOf(':');
+              if (firstColon === -1) return;
+              
+              const type = b.substring(0, firstColon);
+              const rest = b.substring(firstColon + 1);
+              const cols = rest.split(',');
+              
+              const cName = cols[0] || '';
+              const running = cols[1] || '';
+              const terminated = cols[2] || '';
+              const waiting = cols[3] || '';
+              
+              let state = 'waiting';
+              let reasonTooltip = '';
+              
+              if (running) {
+                state = 'running';
+              } else if (terminated) {
+                state = 'terminated';
+                reasonTooltip = ` - ${terminated}`;
+              } else {
+                state = 'waiting';
+                if (waiting) reasonTooltip = ` - ${waiting}`;
+              }
+              
+              const prefix = type === 'i' ? '(Init) ' : '';
+              const tooltip = `${prefix}${cName} (${state})${reasonTooltip}`;
+              statuses.push({ name: cName, state, tooltip });
+            });
           }
-          
-          const prefix = type === 'i' ? '(Init) ' : '';
-          const tooltip = `${prefix}${cName} (${state})${reasonTooltip}`;
-          statuses.push({ name: cName, state, tooltip });
-        });
-      }
-      
-      newContainerStatusMap[key] = statuses;
-    });
+          newContainerStatusMap[key] = statuses;
+        }
 
-    containerStatusMap = { ...containerStatusMap, ...newContainerStatusMap };
+        if (endIndex < lines.length) {
+          requestAnimationFrame(() => {
+            processLinesBatch(endIndex).then(resolve);
+          });
+        } else {
+          resolve();
+        }
+      });
+    }
 
+    await processLinesBatch(0);
     containerStatusMap = { ...containerStatusMap, ...newContainerStatusMap };
 
     // Batch DOM Updates to avoid freezing UI (especially with 200+ pods)
     const tdElements = Array.from(document.querySelectorAll('.k8s-pod-containers-td'));
-    const BATCH_SIZE = 20;
+    const DOM_BATCH_SIZE = 20;
     
-    function processBatch(startIndex) {
-      const endIndex = Math.min(startIndex + BATCH_SIZE, tdElements.length);
+    function processDomBatch(startIndex) {
+      const endIndex = Math.min(startIndex + DOM_BATCH_SIZE, tdElements.length);
       
       for (let i = startIndex; i < endIndex; i++) {
         const td = tdElements[i];
         const key = td.dataset.key;
         const statuses = containerStatusMap[key];
         
-        if (!statuses || statuses.length === 0) {
-          td.innerHTML = '-';
-          continue;
+        let html = '-';
+        if (statuses && statuses.length > 0) {
+          html = `<div class="k8s-pod-containers-wrap">` + statuses.map(s => {
+            return `<span class="k8s-container-block ${s.state}" data-ktip="${escHtml(s.tooltip)}"></span>`;
+          }).join('') + `</div>`;
         }
         
-        const html = `<div class="k8s-pod-containers-wrap">` + statuses.map(s => {
-          return `<span class="k8s-container-block ${s.state}" data-ktip="${escHtml(s.tooltip)}"></span>`;
-        }).join('') + `</div>`;
-        
-        td.innerHTML = html;
+        // Cache mechanism: only update real DOM if the calculated HTML is different 
+        // from the last rendered HTML, bypassing browser recalculation
+        if (td.dataset.lastHtml !== html) {
+          td.innerHTML = html;
+          td.dataset.lastHtml = html;
+        }
       }
       
       if (endIndex < tdElements.length) {
-        requestAnimationFrame(() => processBatch(endIndex));
+        requestAnimationFrame(() => processDomBatch(endIndex));
       }
     }
     
     if (tdElements.length > 0) {
-      processBatch(0);
+      processDomBatch(0);
     }
 
   } catch(e) {
@@ -584,11 +605,26 @@ function renderTable(meta, items) {
         }
       }
 
-      // Placeholder for container badges
+      // Container badges
       if (currentResource === 'pods' && colName === 'Containers') {
         const podNs = currentNs === '--all--' ? cols[0] : currentNs;
         const resolvedName = currentNs === '--all--' ? cols[1] : cols[0];
-        return `<td class="k8s-pod-containers-td" data-key="${podNs}/${resolvedName}" style="overflow: visible;"><span class="k8s-pod-containers-ph">Loading...</span></td>`;
+        const key = `${podNs}/${resolvedName}`;
+        
+        let html = '<span class="k8s-pod-containers-ph">Loading...</span>';
+        const statuses = containerStatusMap[key];
+        
+        if (statuses) {
+          if (statuses.length === 0) {
+            html = '-';
+          } else {
+            html = `<div class="k8s-pod-containers-wrap">` + statuses.map(s => {
+              return `<span class="k8s-container-block ${s.state}" data-ktip="${escHtml(s.tooltip)}"></span>`;
+            }).join('') + `</div>`;
+          }
+        }
+        
+        return `<td class="k8s-pod-containers-td" data-key="${key}" data-last-html="${escHtml(html)}" style="overflow: visible;">${html}</td>`;
       }
       
       // Status badge for pods
