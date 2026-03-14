@@ -1844,20 +1844,72 @@ select {
   margin-bottom: 6px;
 }
 
+.k8s-yaml-editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.k8s-yaml-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 16px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.k8s-yaml-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.k8s-yaml-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--accent-primary);
+}
+
+.k8s-yaml-subheader {
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  flex-shrink: 0;
+}
+
+.k8s-yaml-subheader a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.k8s-yaml-subheader a:hover {
+  text-decoration: underline;
+}
+
+.k8s-yaml-subheader span {
+  color: var(--text-primary);
+}
+
 .k8s-yaml-editor {
   flex: 1;
   width: 100%;
   min-height: 200px;
-  overflow: hidden;
-}
-
-.k8s-yaml-actions {
-  display: flex;
-  gap: 8px;
-  padding: 6px 12px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
+  position: relative;
 }
 
 .k8s-btn-apply {

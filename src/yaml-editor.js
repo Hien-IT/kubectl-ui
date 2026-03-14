@@ -49,32 +49,32 @@ monaco.languages.setMonarchTokensProvider('yaml', {
   }
 });
 
-// Define K8s YAML dark theme
+// Define K8s YAML dark theme (VS Code Default Dark+)
 monaco.editor.defineTheme('k8s-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [
-    { token: 'type', foreground: '6ab0f3' },      // Keys - blue
-    { token: 'string', foreground: '98c379' },     // Strings - green
-    { token: 'keyword', foreground: 'c678dd' },    // Booleans - purple
-    { token: 'number', foreground: 'd19a66' },     // Numbers - orange
-    { token: 'comment', foreground: '5c6370', fontStyle: 'italic' },
-    { token: 'tag', foreground: 'e06c75' },        // Tags - red
-    { token: 'operator', foreground: '56b6c2' },   // List markers - cyan
+    { token: 'type', foreground: '9CDCFE' },      // Keys - light blue
+    { token: 'string', foreground: 'CE9178' },     // Strings - orange
+    { token: 'keyword', foreground: '569CD6' },    // Booleans - blue
+    { token: 'number', foreground: 'B5CEA8' },     // Numbers - light green
+    { token: 'comment', foreground: '6A9955' },    // Comments - green
+    { token: 'tag', foreground: '569CD6' },        // Tags - blue
+    { token: 'operator', foreground: 'D4D4D4' },   // List markers - default
   ],
   colors: {
-    'editor.background': '#0c0c1d',
-    'editor.foreground': '#abb2bf',
-    'editorLineNumber.foreground': '#4b5263',
-    'editorLineNumber.activeForeground': '#6b7280',
-    'editor.selectionBackground': '#3e4451',
-    'editor.lineHighlightBackground': '#1a1a2e',
-    'editorCursor.foreground': '#6366f1',
-    'editorWidget.background': '#161625',
-    'editorWidget.border': '#2a2a3d',
-    'editorSuggestWidget.background': '#161625',
-    'editorSuggestWidget.border': '#2a2a3d',
-    'editorSuggestWidget.selectedBackground': '#2a2a3d',
+    'editor.background': '#1E1E1E',
+    'editor.foreground': '#D4D4D4',
+    'editorLineNumber.foreground': '#858585',
+    'editorLineNumber.activeForeground': '#C6C6C6',
+    'editor.selectionBackground': '#264F78',
+    'editor.lineHighlightBackground': '#2A2D2E',
+    'editorCursor.foreground': '#AEAFAD',
+    'editorWidget.background': '#252526',
+    'editorWidget.border': '#454545',
+    'editorSuggestWidget.background': '#252526',
+    'editorSuggestWidget.border': '#454545',
+    'editorSuggestWidget.selectedBackground': '#062F4A',
   }
 });
 

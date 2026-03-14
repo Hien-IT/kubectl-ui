@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.1.0/ansi_up.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -779,26 +780,37 @@
                 <!-- Tabs generated dynamically by JS -->
                 <div class="k8s-bottom-tabs-right">
                   <div class="k8s-yaml-actions" id="k8s-yaml-actions" style="display:none;">
-                    <button class="k8s-action-btn k8s-action-edit" id="k8s-btn-edit-yaml" style="display:none;">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      <span>Edit</span>
-                    </button>
-                    <button class="k8s-action-btn k8s-action-apply" id="k8s-btn-apply-yaml" style="display:none;">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 4L12 14.01l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      <span>Apply</span>
-                    </button>
-                    <button class="k8s-action-btn k8s-action-cancel" id="k8s-btn-cancel-edit" style="display:none;">
-                      <span>Cancel</span>
-                    </button>
+                    <!-- Removed old action buttons -->
                   </div>
                   <div class="k8s-logs-controls" id="k8s-logs-controls" style="display:none;">
-                    <select id="k8s-logs-container"><option value="">Container</option></select>
-                    <label><input type="checkbox" id="k8s-logs-follow" /> Follow</label>
-                    <label><input type="checkbox" id="k8s-logs-previous" /> Previous</label>
-                    <label><input type="checkbox" id="k8s-logs-timestamps" /> Timestamps</label>
-                    <label><input type="checkbox" id="k8s-logs-all-containers" /> All Containers</label>
-                    <input type="number" id="k8s-logs-tail" placeholder="Tail" value="200" style="width:80px;" />
-                    <button class="btn btn-ghost btn-sm" id="k8s-btn-fetch-logs">Fetch</button>
+                    <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                      <select id="k8s-logs-container"><option value="">Container</option></select>
+                      <div class="k8s-logs-search">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" id="k8s-logs-search-input" placeholder="Search in logs..." />
+                        <span class="k8s-logs-search-match" id="k8s-logs-search-count">0/0</span>
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                      <button class="k8s-log-action-btn" id="k8s-logs-follow-btn" title="Auto Refresh (Follow) Logs">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                      <button class="k8s-log-action-btn" id="k8s-logs-timestamps-btn" title="Show Timestamps">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                      <button class="k8s-log-action-btn" id="k8s-logs-previous-btn" title="Show Previous (Terminated)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                      <button class="k8s-log-action-btn active" id="k8s-logs-wrap-btn" title="Wrap Lines">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h12a4 4 0 010 8H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 17l-3 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                      <button class="k8s-log-action-btn" id="k8s-logs-download-btn" title="Download Logs">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                      <button class="k8s-log-action-btn" id="k8s-btn-fetch-logs" title="Refresh Logs" style="margin-left:4px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                    </div>
                   </div>
                   <button class="k8s-close-btn" id="k8s-btn-close-bottom" title="Close Bottom Panel" style="margin-left:8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -807,7 +819,22 @@
               </div>
               <div class="k8s-bottom-body">
                 <pre class="k8s-detail-content" id="k8s-detail-content">Loading...</pre>
-                <div class="k8s-yaml-editor" id="k8s-yaml-editor" style="display:none;"></div>
+                
+                <!-- YAML Editor Container with Lens-like Toolbar -->
+                <div class="k8s-yaml-editor-container" id="k8s-yaml-editor-container" style="display:none;">
+                  <div class="k8s-yaml-toolbar">
+                    <div style="display:flex; align-items:center; gap:4px;">
+                      <button class="k8s-yaml-toolbar-btn" id="k8s-btn-apply-yaml" title="Save & Apply">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="k8s-yaml-subheader" id="k8s-yaml-subheader">
+                    Editing kubernetes <span id="k8s-yaml-kind">Pod</span> <a href="#" id="k8s-yaml-name-link">...</a> <span id="k8s-yaml-ns-text"></span>
+                  </div>
+                  <div class="k8s-yaml-editor" id="k8s-yaml-editor"></div>
+                </div>
+
               </div>
             </div>
           </div>

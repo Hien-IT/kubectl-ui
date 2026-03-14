@@ -482,12 +482,18 @@ function statusBadge(status) {
 // ===== Detail Panel =====
 const TAB_LABELS = {
   yaml: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> YAML',
-  describe: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="9" y="2" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/></svg> Describe',
   events: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Events',
   logs: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Logs'
 };
+
 let openTabs = []; // Array of open tab types
 let activeBottomTab = null;
+let logsPollTimer = null;
+let ansiUp = null;
+
+if (typeof AnsiUp !== 'undefined') {
+  ansiUp = new AnsiUp();
+}
 
 function initDetailPanel() {
   document.getElementById('k8s-btn-close-detail')?.addEventListener('click', closeRightPanel);
@@ -510,6 +516,65 @@ function initDetailPanel() {
   document.getElementById('k8s-btn-edit-yaml')?.addEventListener('click', handleEditYaml);
   document.getElementById('k8s-btn-apply-yaml')?.addEventListener('click', handleApplyYaml);
   document.getElementById('k8s-btn-cancel-edit')?.addEventListener('click', handleCancelEdit);
+
+  // Log action buttons
+  ['k8s-logs-timestamps-btn', 'k8s-logs-previous-btn', 'k8s-logs-follow-btn'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', (e) => {
+      e.currentTarget.classList.toggle('active');
+      if (id === 'k8s-logs-follow-btn') {
+        const isFollow = e.currentTarget.classList.contains('active');
+        if (isFollow) {
+          fetchLogs(); // immediate fetch
+          if (!logsPollTimer) logsPollTimer = setInterval(fetchLogs, 3000);
+        } else {
+          clearInterval(logsPollTimer);
+          logsPollTimer = null;
+        }
+      } else {
+        fetchLogs();
+      }
+    });
+  });
+
+  document.getElementById('k8s-logs-wrap-btn')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    btn.classList.toggle('active');
+    const content = document.getElementById('k8s-detail-content');
+    if (btn.classList.contains('active')) {
+      content.style.whiteSpace = 'pre-wrap';
+    } else {
+      content.style.whiteSpace = 'pre';
+    }
+  });
+
+  document.getElementById('k8s-logs-download-btn')?.addEventListener('click', () => {
+    const content = document.getElementById('k8s-detail-content').textContent;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs-${selectedItem?.name || 'unknown'}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Log search
+  document.getElementById('k8s-logs-search-input')?.addEventListener('input', (e) => {
+    const val = e.target.value.toLowerCase();
+    const contentEl = document.getElementById('k8s-detail-content');
+    if (!window._rawLogsContent) window._rawLogsContent = contentEl.textContent;
+    
+    if (!val) {
+      contentEl.textContent = window._rawLogsContent;
+      document.getElementById('k8s-logs-search-count').textContent = '0/0';
+      return;
+    }
+    
+    const lines = window._rawLogsContent.split('\n');
+    const matching = lines.filter(l => l.toLowerCase().includes(val));
+    contentEl.textContent = matching.join('\n');
+    document.getElementById('k8s-logs-search-count').textContent = `${matching.length} matches`;
+  });
 
   // Setup resize handles for right panel
   setupDetailResize();
@@ -704,6 +769,8 @@ function closeBottomPanel() {
   document.getElementById('k8s-bottom-panel').style.display = 'none';
   openTabs = [];
   activeBottomTab = null;
+  clearInterval(logsPollTimer);
+  logsPollTimer = null;
   updateOpenTabBtnStates();
   resetYamlEditor();
   if (document.getElementById('k8s-detail').style.display === 'none') {
@@ -717,6 +784,8 @@ function closeAllPanels() {
   document.getElementById('k8s-bottom-panel').style.display = 'none';
   openTabs = [];
   activeBottomTab = null;
+  clearInterval(logsPollTimer);
+  logsPollTimer = null;
   updateOpenTabBtnStates();
   resetYamlEditor();
   selectedItem = null;
@@ -741,7 +810,11 @@ async function loadBottomTab(tab) {
       args = ['get', 'events', ...nsArgs, '--field-selector', `involvedObject.name=${name}`, '--sort-by=.lastTimestamp'];
       break;
     case 'logs':
+      const isFollow = document.getElementById('k8s-logs-follow-btn')?.classList.contains('active');
       fetchLogs();
+      if (isFollow && !logsPollTimer) {
+        logsPollTimer = setInterval(fetchLogs, 3000);
+      }
       return;
     default:
       return;
@@ -1042,32 +1115,51 @@ async function fetchLogs() {
   if (!selectedItem || !k8sInvoke) return;
   const el = document.getElementById('k8s-detail-content');
   el.textContent = 'Fetching logs...';
+  window._rawLogsContent = '';
 
   const { name, namespace } = selectedItem;
   const container = document.getElementById('k8s-logs-container')?.value || '';
-  const tail = document.getElementById('k8s-logs-tail')?.value || '200';
+  const tail = '500'; // Default to 500 lines for better Lens-like experience
   const nsArgs = namespace ? ['-n', namespace] : [];
-  const containerArgs = container ? ['-c', container] : [];
-  const previous = document.getElementById('k8s-logs-previous')?.checked;
-  const timestamps = document.getElementById('k8s-logs-timestamps')?.checked;
-  const allContainers = document.getElementById('k8s-logs-all-containers')?.checked;
+  
+  const previous = document.getElementById('k8s-logs-previous-btn')?.classList.contains('active');
+  const timestamps = document.getElementById('k8s-logs-timestamps-btn')?.classList.contains('active');
 
-  // If all-containers, ignore single container selection
   const args = ['logs', name, ...nsArgs];
-  if (allContainers) {
-    args.push('--all-containers', '--prefix');
-  } else if (container) {
-    args.push('-c', container);
-  }
+  if (container) args.push('-c', container);
+  
   args.push(`--tail=${tail}`);
   if (previous) args.push('--previous');
   if (timestamps) args.push('--timestamps');
+  
   const result = await k8sInvoke('run_kubectl', { args, stdinInput: null });
 
   if (result?.success) {
-    el.textContent = result.stdout || '(no logs)';
-    // Auto-scroll to bottom
-    el.scrollTop = el.scrollHeight;
+    const logs = result.stdout || '(no logs)';
+    window._rawLogsContent = logs;
+    
+    // Check if user has scrolled up to prevent auto-scrolling if they are reading
+    const isScrolledUp = el.scrollHeight > el.clientHeight && el.scrollTop + el.clientHeight < el.scrollHeight - 20;
+
+    if (ansiUp) {
+      el.innerHTML = ansiUp.ansi_to_html(logs);
+    } else {
+      el.textContent = logs;
+    }
+    
+    // Apply search filter if active
+    const searchInput = document.getElementById('k8s-logs-search-input');
+    if (searchInput && searchInput.value) {
+      searchInput.dispatchEvent(new Event('input'));
+    } else {
+      const searchCount = document.getElementById('k8s-logs-search-count');
+      if (searchCount) searchCount.textContent = '0/0';
+    }
+
+    // Auto-scroll to bottom only if we were already at bottom
+    if (!isScrolledUp) {
+      el.scrollTop = el.scrollHeight;
+    }
   } else {
     el.textContent = result?.stderr || 'Failed to fetch logs';
   }
@@ -1077,24 +1169,42 @@ async function fetchLogs() {
 let monacoReady = false;
 
 function resetYamlEditor() {
-  document.getElementById('k8s-yaml-editor').style.display = 'none';
-  document.getElementById('k8s-detail-content').style.display = '';
-  document.getElementById('k8s-btn-edit-yaml').style.display = '';
-  document.getElementById('k8s-btn-apply-yaml').style.display = 'none';
-  document.getElementById('k8s-btn-cancel-edit').style.display = 'none';
+  const container = document.getElementById('k8s-yaml-editor-container');
+  if (container) container.style.display = 'none';
+  const content = document.getElementById('k8s-detail-content');
+  if (content) content.style.display = '';
 }
 
 function handleEditYaml() {
   const content = document.getElementById('k8s-detail-content');
-  const editorContainer = document.getElementById('k8s-yaml-editor');
+  const editorContainer = document.getElementById('k8s-yaml-editor-container');
   content.style.display = 'none';
-  editorContainer.style.display = '';
-  document.getElementById('k8s-btn-edit-yaml').style.display = 'none';
-  document.getElementById('k8s-btn-apply-yaml').style.display = '';
-  document.getElementById('k8s-btn-cancel-edit').style.display = '';
+  editorContainer.style.display = 'flex';
+  editorContainer.style.flexDirection = 'column';
+  editorContainer.style.height = '100%';
+
+  // Subheader update
+  const kind = RESOURCE_META[currentResource]?.singleName || (currentResource.charAt(0).toUpperCase() + currentResource.slice(1, -1));
+  const name = selectedItem?.name || 'unknown';
+  const ns = selectedItem?.namespace || '';
+  
+  const kindEl = document.getElementById('k8s-yaml-kind');
+  if (kindEl) kindEl.textContent = kind;
+  
+  const nameEl = document.getElementById('k8s-yaml-name-link');
+  if (nameEl) nameEl.textContent = name;
+  
+  const nsEl = document.getElementById('k8s-yaml-ns-text');
+  if (nsEl) {
+    if (ns) {
+      nsEl.innerHTML = `in namespace <a href="#" style="color:var(--accent-primary);text-decoration:none;">${ns}</a>`;
+    } else {
+      nsEl.textContent = '';
+    }
+  }
 
   if (!monacoReady) {
-    createEditor(editorContainer);
+    createEditor(document.getElementById('k8s-yaml-editor'));
     monacoReady = true;
   }
   setEditorValue(content.textContent);
