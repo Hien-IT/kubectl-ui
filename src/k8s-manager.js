@@ -599,16 +599,47 @@ async function fetchLogs() {
 }
 
 // ===== Actions =====
+// ===== Custom confirm modal =====
+function showConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('k8s-confirm-overlay');
+    document.getElementById('k8s-confirm-msg').textContent = message;
+    overlay.style.display = '';
+
+    const ok = document.getElementById('k8s-confirm-ok');
+    const cancel = document.getElementById('k8s-confirm-cancel');
+
+    function cleanup(result) {
+      overlay.style.display = 'none';
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlay);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    function onOverlay(e) { if (e.target === overlay) cleanup(false); }
+
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlay);
+  });
+}
+
 async function handleDelete() {
   if (!selectedItem || !k8sInvoke) return;
   const { name, namespace, resource } = selectedItem;
 
-  if (!confirm(`Delete ${resource}/${name} in ${namespace || 'cluster'}?`)) return;
-
-  const nsArgs = namespace ? ['-n', namespace] : [];
-  const result = await k8sInvoke('run_kubectl', { args: ['delete', resource, name, ...nsArgs], stdinInput: null });
+  const confirmed = await showConfirm(`Delete ${resource}/${name} in ${namespace || 'cluster'}?`);
+  if (!confirmed) return;
 
   const toast = document.getElementById('toast');
+  toast.textContent = `Deleting ${name}...`;
+  toast.className = 'toast show';
+
+  const nsArgs = namespace ? ['-n', namespace] : [];
+  const result = await k8sInvoke('run_kubectl', { args: ['delete', resource, name, ...nsArgs, '--wait=false'], stdinInput: null });
+
   if (result?.success) {
     toast.textContent = `Deleted ${name}`;
     toast.className = 'toast success show';

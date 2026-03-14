@@ -1632,3 +1632,62 @@ select {
     display: none;
   }
 }
+
+/* K8s Confirm Modal */
+.k8s-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.k8s-confirm-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 360px;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.k8s-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.k8s-confirm-msg {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.k8s-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.k8s-confirm-delete-btn {
+  background: #ef4444 !important;
+  color: white !important;
+  border: none;
+  font-weight: 600;
+}
+
+.k8s-confirm-delete-btn:hover {
+  background: #dc2626 !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
