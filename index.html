@@ -743,47 +743,29 @@
               <div class="k8s-detail-right" id="k8s-detail" style="display:none;">
                 <div class="k8s-detail-header">
                   <div class="k8s-detail-title">
-                    <span id="k8s-detail-badge" class="item-badge k8s-type-badge">POD</span>
-                    <div class="k8s-detail-title-text">
-                      <h3 id="k8s-detail-name">resource-name</h3>
-                      <span class="k8s-detail-ns-label" id="k8s-detail-ns">namespace</span>
-                    </div>
+                    <h3 id="k8s-detail-name-full">Pod: resource-name</h3>
                   </div>
-                  <button class="k8s-close-btn" id="k8s-btn-close-detail" title="Close">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </button>
-                </div>
-                <!-- Tab buttons + action buttons -->
-                <div class="k8s-open-tabs-bar">
-                  <button class="k8s-open-tab-btn" data-open-tab="yaml">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    YAML
-                  </button>
-                  <button class="k8s-open-tab-btn" data-open-tab="describe">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="9" y="2" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/><path d="M9 14h6M9 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                    Describe
-                  </button>
-                  <button class="k8s-open-tab-btn" data-open-tab="events">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Events
-                  </button>
-                  <button class="k8s-open-tab-btn" data-open-tab="logs" id="k8s-logs-tab" style="display:none;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Logs
-                  </button>
-                  <div class="k8s-tabs-spacer"></div>
-                  <button class="k8s-action-btn k8s-action-scale" id="k8s-btn-scale" style="display:none;" title="Scale">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 3L14 3M21 3L21 10M21 3L14 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21L10 21M3 21L3 14M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Scale</span>
-                  </button>
-                  <button class="k8s-action-btn k8s-action-restart" id="k8s-btn-restart" style="display:none;" title="Restart">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Restart</span>
-                  </button>
-                  <button class="k8s-action-btn k8s-action-delete" id="k8s-btn-delete" title="Delete">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Delete</span>
-                  </button>
+                  <div class="k8s-detail-actions">
+                    <button class="k8s-action-icon-btn" id="k8s-logs-tab" style="display:none;" title="Logs">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+
+                    <button class="k8s-action-icon-btn k8s-action-edit" id="k8s-btn-open-yaml" title="Edit YAML">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-action-icon-btn k8s-action-scale" id="k8s-btn-scale" style="display:none;" title="Scale">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 3L14 3M21 3L21 10M21 3L14 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21L10 21M3 21L3 14M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-action-icon-btn k8s-action-restart" id="k8s-btn-restart" style="display:none;" title="Restart">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-action-icon-btn k8s-action-delete" id="k8s-btn-delete" title="Delete">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="k8s-action-icon-btn k8s-close-btn" id="k8s-btn-close-detail" title="Close">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <div class="k8s-detail-info-body" id="k8s-detail-info-body">
                   <span class="k8s-loading-spinner"></span> Loading...
@@ -797,7 +779,7 @@
                 <!-- Tabs generated dynamically by JS -->
                 <div class="k8s-bottom-tabs-right">
                   <div class="k8s-yaml-actions" id="k8s-yaml-actions" style="display:none;">
-                    <button class="k8s-action-btn k8s-action-edit" id="k8s-btn-edit-yaml">
+                    <button class="k8s-action-btn k8s-action-edit" id="k8s-btn-edit-yaml" style="display:none;">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       <span>Edit</span>
                     </button>
@@ -818,6 +800,9 @@
                     <input type="number" id="k8s-logs-tail" placeholder="Tail" value="200" style="width:80px;" />
                     <button class="btn btn-ghost btn-sm" id="k8s-btn-fetch-logs">Fetch</button>
                   </div>
+                  <button class="k8s-close-btn" id="k8s-btn-close-bottom" title="Close Bottom Panel" style="margin-left:8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
                 </div>
               </div>
               <div class="k8s-bottom-body">

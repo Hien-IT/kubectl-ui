@@ -64,7 +64,7 @@ export function activateK8sPage() {
 // Called when context is switched — reload namespaces + resources
 export function reloadK8sOnContextSwitch() {
   if (!k8sInvoke) return;
-  closeDetail();
+  closeAllPanels();
   nsLoaded = false;
   currentNs = '--all--';
   const sel = document.getElementById('k8s-ns-filter');
@@ -83,7 +83,7 @@ function initResourceNav() {
       document.querySelectorAll('.k8s-nav-item').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentResource = btn.dataset.resource;
-      closeDetail();
+      closeAllPanels();
       showLoading();
       setTimeout(() => fetchResources(), 16);
     });
@@ -371,7 +371,16 @@ function renderTable(meta, items) {
       if (currentResource === 'namespaces' && colName === 'Status') return `<td>${statusBadge(val)}</td>`;
       return `<td>${escHtml(val)}</td>`;
     }).join('');
-    return `<tr class="k8s-row" data-idx="${idx}">${cells}</tr>`;
+
+    let isSelected = false;
+    if (selectedItem && selectedItem.resource === currentResource) {
+      const rowNs = currentNs === '--all--' ? cols[0] : (RESOURCE_META[currentResource].clusterScoped ? '' : currentNs);
+      const rowName = (!RESOURCE_META[currentResource].clusterScoped && currentNs === '--all--') ? cols[1] : cols[0];
+      if (selectedItem.name === rowName && selectedItem.namespace === rowNs) {
+        isSelected = true;
+      }
+    }
+    return `<tr class="k8s-row${isSelected ? ' selected' : ''}" data-idx="${idx}">${cells}</tr>`;
   }).join('');
 
   // Row click → open detail + highlight
@@ -481,18 +490,16 @@ let openTabs = []; // Array of open tab types
 let activeBottomTab = null;
 
 function initDetailPanel() {
-  document.getElementById('k8s-btn-close-detail')?.addEventListener('click', closeDetail);
+  document.getElementById('k8s-btn-close-detail')?.addEventListener('click', closeRightPanel);
+  document.getElementById('k8s-btn-close-bottom')?.addEventListener('click', closeBottomPanel);
 
-  // Open-tab toolbar buttons
-  document.querySelectorAll('.k8s-open-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabType = btn.dataset.openTab;
-      if (openTabs.includes(tabType)) {
-        switchBottomTab(tabType);
-      } else {
-        addBottomTab(tabType);
-      }
-    });
+  document.getElementById('k8s-btn-open-yaml')?.addEventListener('click', () => {
+    if (openTabs.includes('yaml')) switchBottomTab('yaml');
+    else addBottomTab('yaml');
+  });
+  document.getElementById('k8s-logs-tab')?.addEventListener('click', () => {
+    if (openTabs.includes('logs')) switchBottomTab('logs');
+    else addBottomTab('logs');
   });
 
   // Action buttons
@@ -567,48 +574,58 @@ function renderBottomTabs() {
 }
 
 function updateOpenTabBtnStates() {
-  document.querySelectorAll('.k8s-open-tab-btn').forEach(btn => {
-    btn.classList.toggle('opened', openTabs.includes(btn.dataset.openTab));
+  const mapping = {
+    'yaml': 'k8s-btn-open-yaml',
+    'logs': 'k8s-logs-tab'
+  };
+  Object.entries(mapping).forEach(([tab, id]) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      if (openTabs.includes(tab)) btn.classList.add('opened');
+      else btn.classList.remove('opened');
+    }
   });
 }
 
 function setupDetailResize() {
-  const detail = document.getElementById('k8s-detail');
-  if (!detail) return;
-
   // ----- Vertical resize handle (for bottom panel height) -----
-  const handle = document.createElement('div');
-  handle.className = 'k8s-detail-resize-handle';
-  detail.prepend(handle);
+  const bottomPanel = document.getElementById('k8s-bottom-panel');
+  if (bottomPanel) {
+    const handle = document.createElement('div');
+    handle.className = 'k8s-detail-resize-handle'; // Use the vertical handle class
+    bottomPanel.prepend(handle);
 
-  // Restore saved height
-  try {
-    const savedH = localStorage.getItem(DETAIL_HEIGHT_KEY);
-    if (savedH) detail.style.height = savedH + 'px';
-  } catch {}
+    // Restore saved height
+    try {
+      const savedH = localStorage.getItem(DETAIL_HEIGHT_KEY);
+      if (savedH) bottomPanel.style.height = savedH + 'px';
+    } catch {}
 
-  handle.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startH = detail.offsetHeight;
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = bottomPanel.offsetHeight;
 
-    const onMouseMove = (ev) => {
-      const newH = Math.max(150, Math.min(window.innerHeight * 0.8, startH - (ev.clientY - startY)));
-      detail.style.height = newH + 'px';
-      detail.style.maxHeight = 'none';
-    };
-    const onMouseUp = (ev) => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      const finalH = Math.max(150, Math.min(window.innerHeight * 0.8, startH - (ev.clientY - startY)));
-      try { localStorage.setItem(DETAIL_HEIGHT_KEY, finalH); } catch {};
-    };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  });
+      const onMouseMove = (ev) => {
+        const newH = Math.max(150, Math.min(window.innerHeight * 0.8, startH - (ev.clientY - startY)));
+        bottomPanel.style.height = newH + 'px';
+        bottomPanel.style.maxHeight = 'none';
+      };
+      const onMouseUp = (ev) => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        const finalH = Math.max(150, Math.min(window.innerHeight * 0.8, startH - (ev.clientY - startY)));
+        try { localStorage.setItem(DETAIL_HEIGHT_KEY, finalH); } catch {};
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  }
 
-  // ----- Horizontal resize handle (for panel width) -----
-  const hHandle = document.createElement('div');
+  // ----- Horizontal resize handle (for right panel width) -----
+  const detail = document.getElementById('k8s-detail');
+  if (detail) {
+    const hHandle = document.createElement('div');
   hHandle.className = 'k8s-detail-resize-h';
   detail.prepend(hHandle);
 
@@ -642,6 +659,7 @@ function setupDetailResize() {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   });
+  }
 }
 
 function openDetail(item) {
@@ -653,9 +671,10 @@ function openDetail(item) {
 
   // Show right panel with info
   document.getElementById('k8s-detail').style.display = '';
-  document.getElementById('k8s-detail-badge').textContent = currentResource.toUpperCase().replace(/S$/, '');
-  document.getElementById('k8s-detail-name').textContent = name;
-  document.getElementById('k8s-detail-ns').textContent = ns ? `ns: ${ns}` : 'cluster-scoped';
+  
+  // Format title like Lens: "Pod: name"
+  const kindName = currentResource.charAt(0).toUpperCase() + currentResource.slice(1).replace(/s$/, '');
+  document.getElementById('k8s-detail-name-full').textContent = `${kindName}: ${name}`;
 
   // Show/hide action buttons
   document.getElementById('k8s-btn-restart').style.display = meta.restartable ? '' : 'none';
@@ -673,7 +692,27 @@ function openDetail(item) {
   if (meta.hasPodFeatures) loadPodContainers();
 }
 
-function closeDetail() {
+function closeRightPanel() {
+  document.getElementById('k8s-detail').style.display = 'none';
+  if (document.getElementById('k8s-bottom-panel').style.display === 'none') {
+    selectedItem = null;
+    document.querySelectorAll('.k8s-row.selected').forEach(r => r.classList.remove('selected'));
+  }
+}
+
+function closeBottomPanel() {
+  document.getElementById('k8s-bottom-panel').style.display = 'none';
+  openTabs = [];
+  activeBottomTab = null;
+  updateOpenTabBtnStates();
+  resetYamlEditor();
+  if (document.getElementById('k8s-detail').style.display === 'none') {
+    selectedItem = null;
+    document.querySelectorAll('.k8s-row.selected').forEach(r => r.classList.remove('selected'));
+  }
+}
+
+function closeAllPanels() {
   document.getElementById('k8s-detail').style.display = 'none';
   document.getElementById('k8s-bottom-panel').style.display = 'none';
   openTabs = [];
@@ -681,7 +720,6 @@ function closeDetail() {
   updateOpenTabBtnStates();
   resetYamlEditor();
   selectedItem = null;
-  // Clear row highlight
   document.querySelectorAll('.k8s-row.selected').forEach(r => r.classList.remove('selected'));
 }
 
@@ -699,9 +737,6 @@ async function loadBottomTab(tab) {
     case 'yaml':
       args = ['get', resource, name, ...nsArgs, '-o', 'yaml'];
       break;
-    case 'describe':
-      args = ['describe', resource, name, ...nsArgs];
-      break;
     case 'events':
       args = ['get', 'events', ...nsArgs, '--field-selector', `involvedObject.name=${name}`, '--sort-by=.lastTimestamp'];
       break;
@@ -715,6 +750,9 @@ async function loadBottomTab(tab) {
   const result = await k8sInvoke('run_kubectl', { args, stdinInput: null });
   if (result?.success) {
     el.textContent = result.stdout || '(empty)';
+    if (tab === 'yaml') {
+      setTimeout(() => handleEditYaml(), 50);
+    }
   } else {
     el.textContent = result?.stderr || 'Failed to fetch data';
   }
@@ -823,40 +861,69 @@ async function loadInfoTab() {
   if (containers.length) {
     html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Containers</div>';
     containers.forEach(c => {
-      html += `<div class="k8s-info-container">`;
-      html += `<div class="k8s-info-container-name">🟢 ${c.name}</div>`;
-      html += infoRow('Image', c.image || '-');
-      if (c.ports?.length) {
-        html += infoRow('Ports', c.ports.map(p => `${p.containerPort}/${p.protocol || 'TCP'}`).join(', '));
+      // Find container status if it's a pod
+      let cStatus = null;
+      if (status.containerStatuses) {
+        cStatus = status.containerStatuses.find(cs => cs.name === c.name);
       }
+      
+      let stateBadge = '🟢';
+      let stateText = 'running';
+      if (cStatus) {
+        const stateKey = Object.keys(cStatus.state || {})[0];
+        if (stateKey === 'waiting') { stateBadge = '🟡'; stateText = 'waiting'; }
+        else if (stateKey === 'terminated') { stateBadge = '🔴'; stateText = 'terminated'; }
+      }
+
+      html += `<div class="k8s-info-container">`;
+      html += `<div class="k8s-info-container-name">${stateBadge} ${c.name}</div>`;
+      
+      if (cStatus) {
+        html += infoRow('Status', `<span style="color:${stateText==='running'?'var(--success)':'var(--warning)'}">${stateText}${cStatus.ready ? ', ready' : ''}</span>`);
+      }
+      
+      html += infoRow('Image', `<span class="k8s-info-badge">${c.image || '-'}</span>`);
+      html += infoRow('ImagePullPolicy', c.imagePullPolicy || '-');
+      
+      if (c.ports?.length) {
+        html += infoRow('Ports', c.ports.map(p => `<span class="k8s-info-link">http: ${p.containerPort}/${p.protocol || 'TCP'}</span> <span class="k8s-info-badge" style="float:right;">Forward...</span>`).join('<br>'));
+      }
+      
+      if (c.env?.length) {
+        html += infoRow('Environment', `${c.env.length} Environmental Variables`);
+      }
+      
+      if (c.volumeMounts?.length) {
+        html += infoRow('Mounts', c.volumeMounts.map(m => `<span style="font-family:var(--font-mono);font-size:0.75rem;background:rgba(255,255,255,0.05);padding:2px 4px;border-radius:2px;">${m.mountPath}</span><br><span style="color:var(--text-muted);font-size:0.75rem;">from ${m.name} ${m.readOnly ? '(ro)' : '(rw)'}</span>`).join('<br><br>'));
+      }
+      
+      const formatProbe = (p) => {
+        if (!p) return null;
+        let parts = [];
+        if (p.httpGet) parts.push(`http-get http://:${p.httpGet.port}${p.httpGet.path}`);
+        else if (p.exec) parts.push(`exec ${p.exec.command?.join(' ')}`);
+        else if (p.tcpSocket) parts.push(`tcp-socket :${p.tcpSocket.port}`);
+        parts.push(`delay=${p.initialDelaySeconds||0}s`);
+        parts.push(`timeout=${p.timeoutSeconds||1}s`);
+        parts.push(`period=${p.periodSeconds||10}s`);
+        parts.push(`#success=${p.successThreshold||1}`);
+        parts.push(`#failure=${p.failureThreshold||3}`);
+        return parts.map(x => `<span class="k8s-info-badge">${x}</span>`).join(' ');
+      };
+      
+      if (c.livenessProbe) html += infoRow('Liveness', formatProbe(c.livenessProbe));
+      if (c.readinessProbe) html += infoRow('Readiness', formatProbe(c.readinessProbe));
+      
       if (c.resources) {
         const req = c.resources.requests || {};
         const lim = c.resources.limits || {};
-        if (Object.keys(req).length) html += infoRow('Requests', Object.entries(req).map(([k,v]) => `${k}: ${v}`).join(', '));
-        if (Object.keys(lim).length) html += infoRow('Limits', Object.entries(lim).map(([k,v]) => `${k}: ${v}`).join(', '));
+        html += infoRow('Requests', Object.keys(req).length ? Object.entries(req).map(([k,v]) => `${k.toUpperCase()}: ${v}`).join(', ') : '-');
+        html += infoRow('Limits', Object.keys(lim).length ? Object.entries(lim).map(([k,v]) => `${k.toUpperCase()}: ${v}`).join(', ') : '-');
+      } else {
+        html += infoRow('Requests', 'CPU: —, Memory: —');
+        html += infoRow('Limits', 'CPU: —, Memory: —');
       }
-      if (c.env?.length) {
-        html += infoRow('Env', `${c.env.length} variables`);
-      }
-      if (c.volumeMounts?.length) {
-        html += infoRow('Mounts', c.volumeMounts.map(m => `${m.name} → ${m.mountPath}`).join('<br>'));
-      }
-      html += '</div>';
-    });
-    html += '</div>';
-  }
-
-  // Container statuses (for pods)
-  if (status.containerStatuses?.length) {
-    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Container Status</div>';
-    status.containerStatuses.forEach(cs => {
-      const state = Object.keys(cs.state || {})[0] || 'unknown';
-      html += `<div class="k8s-info-container">`;
-      html += `<div class="k8s-info-container-name">${state === 'running' ? '🟢' : state === 'waiting' ? '🟡' : '🔴'} ${cs.name}</div>`;
-      html += infoRow('State', state);
-      html += infoRow('Ready', cs.ready ? '✅ Yes' : '❌ No');
-      html += infoRow('Restarts', `${cs.restartCount || 0}`);
-      html += infoRow('Image', cs.image || '-');
+      
       html += '</div>';
     });
     html += '</div>';
@@ -873,15 +940,38 @@ async function loadInfoTab() {
     html += '</div>';
   }
 
-  // ===== Tolerations =====
-  const tolerations = spec.tolerations || (spec.template?.spec?.tolerations) || [];
-  if (tolerations.length) {
-    html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Tolerations</div>';
-    tolerations.forEach(t => {
-      html += infoRow(t.key || '*', `${t.operator || 'Equal'} ${t.value || ''} (${t.effect || 'all'})`);
-    });
-    html += '</div>';
+  // ===== Events Section =====
+  html += '<div class="k8s-info-section"><div class="k8s-info-section-title">Events</div>';
+  const eventsResult = await k8sInvoke('run_kubectl', { 
+    args: ['get', 'events', ...nsArgs, '--field-selector', `involvedObject.name=${name}`, '-o', 'json'],
+    stdinInput: null
+  });
+  
+  if (eventsResult?.success) {
+    try {
+      const eventsObj = JSON.parse(eventsResult.stdout);
+      const items = eventsObj.items || [];
+      if (items.length > 0) {
+        items.sort((a, b) => new Date(b.lastTimestamp || b.eventTime) - new Date(a.lastTimestamp || a.eventTime));
+        items.forEach(ev => {
+          html += `<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);">`;
+          html += `<div style="display:flex;justify-content:space-between;color:var(--text-muted);font-size:0.75rem;margin-bottom:4px;">
+                     <span><span style="color:${ev.type==='Warning'?'var(--danger)':'var(--success)'}">${ev.type}</span> • ${ev.reason}</span>
+                     <span>${timeAgo(ev.lastTimestamp || ev.eventTime)}</span>
+                   </div>`;
+          html += `<div style="color:var(--text-primary);font-size:0.8rem;">${ev.message}</div>`;
+          html += `</div>`;
+        });
+      } else {
+        html += '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">No events found</div>';
+      }
+    } catch {
+      html += '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">Failed to parse events</div>';
+    }
+  } else {
+    html += '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">No events found</div>';
   }
+  html += '</div>';
 
   html += '</div>';
   el.innerHTML = html;
@@ -1162,7 +1252,7 @@ async function handleDelete() {
   if (result?.success) {
     toast.textContent = `Deleted ${name}`;
     toast.className = 'toast success show';
-    closeDetail();
+    closeAllPanels();
     fetchResources();
   } else {
     toast.textContent = result?.stderr || 'Delete failed';
