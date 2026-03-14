@@ -50,6 +50,10 @@ export function activateK8sPage() {
   setTimeout(() => {
     loadK8sNamespaces();
     fetchResources();
+    // Start auto-refresh if checkbox is checked (default: on)
+    if (!autoRefreshTimer && document.getElementById('k8s-auto-refresh-toggle')?.checked) {
+      autoRefreshTimer = setInterval(fetchResources, 5000);
+    }
   }, 16);
 }
 
