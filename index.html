@@ -48,6 +48,10 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>SA</span>
         </button>
+        <button class="sidebar-item" data-page="k8s-manager" title="K8s Resources">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>K8s</span>
+        </button>
       </nav>
 
       <!-- Page: YAML Generator -->
@@ -660,6 +664,113 @@
 
         </div>
       </div><!-- /page-sa-manager -->
+
+      <!-- Page: K8s Resource Manager -->
+      <div class="page" id="page-k8s-manager">
+        <div class="k8s-layout">
+          <!-- Resource Type Sidebar -->
+          <div class="k8s-sidebar">
+            <div class="k8s-sidebar-section">
+              <div class="k8s-sidebar-title">Workloads</div>
+              <button class="k8s-nav-item active" data-resource="pods">🟢 Pods</button>
+              <button class="k8s-nav-item" data-resource="deployments">🚀 Deployments</button>
+              <button class="k8s-nav-item" data-resource="statefulsets">📦 StatefulSets</button>
+              <button class="k8s-nav-item" data-resource="daemonsets">🔄 DaemonSets</button>
+              <button class="k8s-nav-item" data-resource="replicasets">📋 ReplicaSets</button>
+              <button class="k8s-nav-item" data-resource="jobs">⚡ Jobs</button>
+              <button class="k8s-nav-item" data-resource="cronjobs">⏰ CronJobs</button>
+            </div>
+            <div class="k8s-sidebar-section">
+              <div class="k8s-sidebar-title">Network</div>
+              <button class="k8s-nav-item" data-resource="services">🔗 Services</button>
+              <button class="k8s-nav-item" data-resource="ingresses">🌐 Ingresses</button>
+            </div>
+            <div class="k8s-sidebar-section">
+              <div class="k8s-sidebar-title">Config</div>
+              <button class="k8s-nav-item" data-resource="configmaps">⚙️ ConfigMaps</button>
+              <button class="k8s-nav-item" data-resource="secrets">🔐 Secrets</button>
+              <button class="k8s-nav-item" data-resource="hpa">📊 HPA</button>
+            </div>
+            <div class="k8s-sidebar-section">
+              <div class="k8s-sidebar-title">Storage</div>
+              <button class="k8s-nav-item" data-resource="persistentvolumeclaims">💾 PVCs</button>
+            </div>
+            <div class="k8s-sidebar-section">
+              <div class="k8s-sidebar-title">Cluster</div>
+              <button class="k8s-nav-item" data-resource="nodes">🖥️ Nodes</button>
+              <button class="k8s-nav-item" data-resource="namespaces">🏷️ Namespaces</button>
+            </div>
+          </div>
+
+          <!-- Main Content Area -->
+          <div class="k8s-content">
+            <!-- Toolbar -->
+            <div class="k8s-toolbar">
+              <div class="k8s-toolbar-left">
+                <h2 id="k8s-resource-title">Pods</h2>
+                <span class="k8s-count" id="k8s-resource-count">0</span>
+              </div>
+              <div class="k8s-toolbar-right">
+                <select id="k8s-ns-filter">
+                  <option value="--all--">All Namespaces</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" id="k8s-btn-refresh" title="Refresh">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <label class="k8s-auto-refresh">
+                  <input type="checkbox" id="k8s-auto-refresh-toggle" />
+                  <span>Auto 5s</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Resource Table -->
+            <div class="k8s-table-wrap" id="k8s-table-wrap">
+              <table class="k8s-table">
+                <thead id="k8s-table-head"><tr><th>Name</th><th>Namespace</th><th>Status</th><th>Age</th></tr></thead>
+                <tbody id="k8s-table-body">
+                  <tr><td colspan="4" class="k8s-empty">Select a resource type to browse</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Detail Panel (hidden by default) -->
+            <div class="k8s-detail" id="k8s-detail" style="display:none;">
+              <div class="k8s-detail-header">
+                <div class="k8s-detail-title">
+                  <span id="k8s-detail-badge" class="item-badge">POD</span>
+                  <h3 id="k8s-detail-name">resource-name</h3>
+                  <span class="hint" id="k8s-detail-ns">namespace</span>
+                </div>
+                <div class="k8s-detail-actions">
+                  <button class="btn btn-ghost btn-sm" id="k8s-btn-scale" style="display:none;">📏 Scale</button>
+                  <button class="btn btn-ghost btn-sm" id="k8s-btn-restart" style="display:none;">🔄 Restart</button>
+                  <button class="btn btn-ghost btn-sm k8s-btn-danger" id="k8s-btn-delete">🗑️ Delete</button>
+                  <button class="btn-icon" id="k8s-btn-close-detail" title="Close">×</button>
+                </div>
+              </div>
+              <div class="k8s-detail-tabs">
+                <button class="k8s-detail-tab active" data-dtab="yaml">YAML</button>
+                <button class="k8s-detail-tab" data-dtab="describe">Describe</button>
+                <button class="k8s-detail-tab" data-dtab="events">Events</button>
+                <button class="k8s-detail-tab" data-dtab="logs" id="k8s-logs-tab" style="display:none;">Logs</button>
+              </div>
+              <div class="k8s-detail-body">
+                <pre class="k8s-detail-content" id="k8s-detail-content">Loading...</pre>
+                <div class="k8s-logs-controls" id="k8s-logs-controls" style="display:none;">
+                  <select id="k8s-logs-container"><option value="">Container</option></select>
+                  <label><input type="checkbox" id="k8s-logs-follow" /> Follow</label>
+                  <label><input type="checkbox" id="k8s-logs-previous" /> Previous</label>
+                  <label><input type="checkbox" id="k8s-logs-timestamps" /> Timestamps</label>
+                  <label><input type="checkbox" id="k8s-logs-all-containers" /> All Containers</label>
+                  <input type="number" id="k8s-logs-tail" placeholder="Tail lines" value="200" style="width:100px;" />
+                  <button class="btn btn-ghost btn-sm" id="k8s-btn-fetch-logs">Fetch</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /page-k8s-manager -->
 
     </div><!-- /app-body -->
 

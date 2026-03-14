@@ -12,6 +12,7 @@ import { initActions } from './actions.js';
 import { updatePreview } from './preview.js';
 import { initModal } from './modal.js';
 import { initSAManager } from './sa-manager.js';
+import { initK8sManager } from './k8s-manager.js';
 
 // ===== Initialize =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -28,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initNamespaceDropdown(updatePreview);
   initContextSwitcher();
   initSAManager(getInvoke());
+  initK8sManager(getInvoke());
 
   // Initial preview render
   updatePreview();
