@@ -212,32 +212,38 @@ let pvcToPodsMap = {};
 
 async function lazyLoadPvcPods() {
   if (!k8sInvoke) return;
-  const topArgs = ['get', 'pods', '-A', '-o', 'json'];
+  
+  // Use jsonpath to only fetch namespace, pod name, and pvc claims to massively reduce payload and parsing time
+  const topArgs = [
+    'get', 'pods', '-A', 
+    '-o', 'jsonpath={range .items[*]}{.metadata.namespace}{"\\t"}{.metadata.name}{"\\t"}{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{","}{end}{"\\n"}{end}'
+  ];
 
   const result = await k8sInvoke('run_kubectl', { args: topArgs, stdinInput: null });
   if (!result?.success) return;
 
   try {
-    const data = JSON.parse(result.stdout);
     pvcToPodsMap = {};
-    if (data.items) {
-      data.items.forEach(pod => {
-        const podNs = pod.metadata.namespace;
-        const podName = pod.metadata.name;
-        if (pod.spec && pod.spec.volumes) {
-          pod.spec.volumes.forEach(vol => {
-            if (vol.persistentVolumeClaim) {
-              const claimName = vol.persistentVolumeClaim.claimName;
-              const key = `${podNs}/${claimName}`;
-              if (!pvcToPodsMap[key]) pvcToPodsMap[key] = [];
-              pvcToPodsMap[key].push(podName);
-            }
+    const lines = result.stdout.split('\n');
+    lines.forEach(line => {
+      const parts = line.split('\t');
+      if (parts.length >= 3) {
+        const podNs = parts[0];
+        const podName = parts[1];
+        const claimsStr = parts[2];
+        
+        if (claimsStr) {
+          const claims = claimsStr.split(',').filter(Boolean);
+          claims.forEach(claimName => {
+            const key = `${podNs}/${claimName}`;
+            if (!pvcToPodsMap[key]) pvcToPodsMap[key] = [];
+            pvcToPodsMap[key].push(podName);
           });
         }
-      });
-    }
+      }
+    });
   } catch (e) {
-    console.error("Failed to parse pods JSON", e);
+    console.error("Failed to parse pods mapping", e);
     return;
   }
 
@@ -396,6 +402,7 @@ function renderTable(meta, items) {
   tbody.innerHTML = items.map((cols, idx) => {
     const cells = orderedCols.map((colName, vi) => {
       let val = '';
+      const origIdx = order[vi];
       if (currentResource === 'pods') {
         const podName = cols[0];
         const podNs = currentNs === '--all--' ? cols[0] : currentNs;
@@ -417,7 +424,6 @@ function renderTable(meta, items) {
         // Other resources mapping
         // kubectl get -A usually returns: NAMESPACE, NAME, ...
         // We want display: NAME, NAMESPACE, ...
-        const origIdx = order[vi];
         if (currentNs === '--all--' && meta.cols[1] === 'Namespace') {
           if (origIdx === 0) val = cols[1]; // Name
           else if (origIdx === 1) val = cols[0]; // Namespace
