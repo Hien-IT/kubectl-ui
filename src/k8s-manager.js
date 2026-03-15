@@ -70,6 +70,17 @@ export function reloadK8sOnContextSwitch() {
   currentNs = '--all--';
   const sel = document.getElementById('k8s-ns-filter');
   if (sel) sel.value = '--all--';
+  
+  cachedItems = [];
+  const tbody = document.getElementById('k8s-table-body');
+  if (tbody) {
+    tbody.innerHTML = '';
+    // Prevent DOM diffing logic from leaving behind old lines when context changes
+    for (let i = 0; i < tbody.children.length; i++) {
+        tbody.children[i].removeAttribute('data-last-row-html');
+    }
+  }
+
   showLoading();
   setTimeout(() => {
     loadK8sNamespaces(true);
