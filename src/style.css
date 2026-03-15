@@ -579,7 +579,7 @@ select {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 0;
+  padding: 14px 16px;
   margin-bottom: 8px;
   overflow: hidden;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -591,29 +591,12 @@ select {
 }
 
 .ingress-rule > .mount-header {
+  margin: -14px -16px 14px -16px;
   padding: 10px 16px;
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.ingress-rule > .form-group,
-.ingress-rule > .ingress-paths,
-.ingress-rule > .btn {
-  margin-left: 16px;
-  margin-right: 16px;
-}
-
-.ingress-rule > .form-group {
-  margin-top: 14px;
-}
-
-.ingress-rule > .ingress-paths {
-  margin-bottom: 4px;
-}
-
-.ingress-rule > .btn {
-  margin-bottom: 14px;
-}
 
 .ingress-paths {
   display: flex;
