@@ -944,7 +944,7 @@ function renderBottomTabs() {
     btn.innerHTML = `${iconSvg} <span class="tab-text">${tab.resource === 'pods' ? 'Pod ' : ''}${tab.name}</span> <span class="tab-close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
     btn.addEventListener('click', (e) => {
-      if (e.target.classList.contains('tab-close')) {
+      if (e.target.closest('.tab-close')) {
         removeBottomTab(tab.id);
       } else {
         switchBottomTab(tab.id);
@@ -982,9 +982,12 @@ function setupDetailResize() {
   // ----- Vertical resize handle (for bottom panel height) -----
   const bottomPanel = document.getElementById('k8s-bottom-panel');
   if (bottomPanel) {
-    const handle = document.createElement('div');
-    handle.className = 'k8s-detail-resize-handle'; // Use the vertical handle class
-    bottomPanel.prepend(handle);
+    let handle = bottomPanel.querySelector('.k8s-detail-resize-handle');
+    if (!handle) {
+      handle = document.createElement('div');
+      handle.className = 'k8s-detail-resize-handle';
+      bottomPanel.prepend(handle);
+    }
 
     // Restore saved height
     try {
