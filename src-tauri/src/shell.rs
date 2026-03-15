@@ -20,7 +20,16 @@ pub fn get_shell_env() -> HashMap<String, String> {
                 let mut env_map = HashMap::new();
                 for line in env_str.lines() {
                     if let Some((key, val)) = line.split_once('=') {
-                        env_map.insert(key.to_string(), val.to_string());
+                        if key == "KUBECONFIG" {
+                            // Sanitize KUBECONFIG by removing empty paths
+                            let cleaned_val = val.split(':')
+                                .filter(|s| !s.is_empty())
+                                .collect::<Vec<_>>()
+                                .join(":");
+                            env_map.insert(key.to_string(), cleaned_val);
+                        } else {
+                            env_map.insert(key.to_string(), val.to_string());
+                        }
                     }
                 }
                 env_map
