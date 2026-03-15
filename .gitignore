@@ -24,3 +24,18 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Lock files (large, not needed for AI scanning)
+package-lock.json
+
+# Cache
+.cache/
+.parcel-cache/
+.turbo/
+
+# Coverage
+coverage/
+
+# Temp
+tmp/
+temp/
