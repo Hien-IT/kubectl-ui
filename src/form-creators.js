@@ -337,7 +337,7 @@ export function createServiceItem(name, updatePreview, refreshIngressServiceDrop
   div.className = 'resource-item';
   div.innerHTML = `
     <div class="item-header">
-      <span class="item-badge" style="background:rgba(96,165,250,0.15);color:#60a5fa;">SVC</span>
+      <span class="item-badge svc-badge">SVC</span>
       <input type="text" class="item-name" placeholder="service-name" value="${name}" />
       <button class="btn-icon btn-remove-item" title="Remove">×</button>
     </div>
@@ -350,7 +350,13 @@ export function createServiceItem(name, updatePreview, refreshIngressServiceDrop
           <option value="LoadBalancer">LoadBalancer</option>
         </select>
       </div>
-      <label style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;display:block;">Ports</label>
+      <div class="svc-port-labels">
+        <span style="flex:2;">Name</span>
+        <span style="flex:1;">Port</span>
+        <span style="flex:1;">Target</span>
+        <span style="flex:1;">Protocol</span>
+        <span style="width:28px;"></span>
+      </div>
       <div class="svc-port-list">
         <div class="svc-port-row">
           <input type="text" placeholder="Name" value="http" class="svc-port-name" />

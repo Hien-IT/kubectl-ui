@@ -25,7 +25,7 @@
           </svg>
           <h1>Kubectl UI</h1>
         </div>
-        <span class="subtitle">K8s Manager</span>
+        <span class="subtitle">Kubectl Tools</span>
       </div>
       <div class="header-center">
         <div class="context-selector">
@@ -49,10 +49,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>SA</span>
         </button>
-        <button class="sidebar-item" data-page="k8s-manager" title="K8s Resources">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>K8s</span>
-        </button>
+
       </nav>
 
       <!-- Page: YAML Generator -->
@@ -666,217 +663,9 @@
         </div>
       </div><!-- /page-sa-manager -->
 
-      <!-- Page: K8s Resource Manager -->
-      <div class="page" id="page-k8s-manager">
-        <div class="k8s-layout">
-          <!-- Resource Type Sidebar -->
-          <div class="k8s-sidebar">
-            <div class="k8s-sidebar-section">
-              <div class="k8s-sidebar-title">Workloads</div>
-              <button class="k8s-nav-item active" data-resource="pods">🟢 Pods</button>
-              <button class="k8s-nav-item" data-resource="deployments">🚀 Deployments</button>
-              <button class="k8s-nav-item" data-resource="statefulsets">📦 StatefulSets</button>
-              <button class="k8s-nav-item" data-resource="daemonsets">🔄 DaemonSets</button>
-              <button class="k8s-nav-item" data-resource="replicasets">📋 ReplicaSets</button>
-              <button class="k8s-nav-item" data-resource="jobs">⚡ Jobs</button>
-              <button class="k8s-nav-item" data-resource="cronjobs">⏰ CronJobs</button>
-            </div>
-            <div class="k8s-sidebar-section">
-              <div class="k8s-sidebar-title">Network</div>
-              <button class="k8s-nav-item" data-resource="services">🔗 Services</button>
-              <button class="k8s-nav-item" data-resource="ingresses">🌐 Ingresses</button>
-            </div>
-            <div class="k8s-sidebar-section">
-              <div class="k8s-sidebar-title">Config</div>
-              <button class="k8s-nav-item" data-resource="configmaps">⚙️ ConfigMaps</button>
-              <button class="k8s-nav-item" data-resource="secrets">🔐 Secrets</button>
-              <button class="k8s-nav-item" data-resource="hpa">📊 HPA</button>
-            </div>
-            <div class="k8s-sidebar-section">
-              <div class="k8s-sidebar-title">Storage</div>
-              <button class="k8s-nav-item" data-resource="persistentvolumeclaims">💾 PVCs</button>
-            </div>
-            <div class="k8s-sidebar-section">
-              <div class="k8s-sidebar-title">Cluster</div>
-              <button class="k8s-nav-item" data-resource="nodes">🖥️ Nodes</button>
-              <button class="k8s-nav-item" data-resource="namespaces">🏷️ Namespaces</button>
-            </div>
-          </div>
-
-          <!-- Main Content Area -->
-          <div class="k8s-content">
-            <!-- Toolbar -->
-            <div class="k8s-toolbar">
-              <div class="k8s-toolbar-left">
-                <h2 id="k8s-resource-title">Pods</h2>
-                <span class="k8s-count" id="k8s-resource-count">0</span>
-              </div>
-              <div class="k8s-toolbar-right">
-                <select id="k8s-ns-filter">
-                  <option value="--all--">All Namespaces</option>
-                </select>
-                <button class="btn btn-ghost btn-sm k8s-lock-btn active" id="k8s-col-lock-toggle" title="Lock column widths (fixed table)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                </button>
-                <button class="btn btn-ghost btn-sm" id="k8s-btn-refresh" title="Refresh">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
-                <select id="k8s-auto-refresh-toggle" class="app-input app-input-sm" style="width: auto; height: 26px; padding: 0 4px; font-size: 12px;">
-                  <option value="0">Auto: Off</option>
-                  <option value="5000" selected>Auto: 5s</option>
-                  <option value="10000">Auto: 10s</option>
-                  <option value="30000">Auto: 30s</option>
-                  <option value="60000">Auto: 60s</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Top Area: Table + Right Info Panel -->
-            <div class="k8s-top-area">
-              <!-- Resource Table -->
-              <div class="k8s-table-wrap" id="k8s-table-wrap">
-                <table class="k8s-table">
-                  <thead id="k8s-table-head"><tr><th>Name</th><th>Namespace</th><th>Status</th><th>Age</th></tr></thead>
-                  <tbody id="k8s-table-body">
-                    <tr><td colspan="4" class="k8s-empty">Select a resource type to browse</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Right Info Panel (hidden by default) -->
-              <div class="k8s-detail-right" id="k8s-detail" style="display:none;">
-                <div class="k8s-detail-header">
-                  <div class="k8s-detail-title">
-                    <h3 id="k8s-detail-name-full">Pod: resource-name</h3>
-                  </div>
-                  <div class="k8s-detail-actions">
-                    <button class="k8s-action-icon-btn" id="k8s-logs-tab" style="display:none;" title="Logs">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-
-                    <button class="k8s-action-icon-btn k8s-action-edit" id="k8s-btn-open-yaml" title="Edit YAML">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-action-icon-btn k8s-action-scale" id="k8s-btn-scale" style="display:none;" title="Scale">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 3L14 3M21 3L21 10M21 3L14 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21L10 21M3 21L3 14M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-action-icon-btn k8s-action-restart" id="k8s-btn-restart" style="display:none;" title="Restart">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-action-icon-btn k8s-action-delete" id="k8s-btn-delete" title="Delete">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-action-icon-btn k8s-close-btn" id="k8s-btn-close-detail" title="Close">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                  </div>
-                </div>
-                <div class="k8s-detail-info-body" id="k8s-detail-info-body">
-                  <span class="k8s-loading-spinner"></span> Loading...
-                </div>
-              </div>
-            </div>
-
-            <!-- Bottom Panel: dynamic tabs (hidden by default) -->
-            <div class="k8s-bottom-panel" id="k8s-bottom-panel" style="display:none;">
-              <div class="k8s-detail-resize-handle"></div>
-              
-              <!-- ROWS 1: TABS -->
-              <div class="k8s-bottom-tabs-wrapper" style="display:flex; justify-content:space-between; background:var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
-                <div class="k8s-bottom-tabs" id="k8s-bottom-tabs" style="display: flex; flex:1; overflow-x: auto; border:none;">
-                  <!-- Tabs generated dynamically by JS -->
-                </div>
-                <div style="display:flex; align-items:center; padding: 0 12px; gap: 4px; border-bottom: 1px solid transparent;">
-                  <button class="k8s-action-icon-btn" id="k8s-btn-maximize-bottom" title="Maximize Panel">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14l8-8 8 8"/></svg>
-                  </button>
-                  <button class="k8s-close-btn" id="k8s-btn-close-bottom" title="Close Bottom Panel">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- ROW 2: CONTROLS (Logs Toolbar) -->
-              <div class="k8s-bottom-toolbar" id="k8s-bottom-toolbar" style="display:none; background: #1e1e1e; padding: 6px 16px; border-bottom: 1px dotted rgba(255,255,255,0.1);">
-                <div class="k8s-yaml-actions" id="k8s-yaml-actions" style="display:none;"></div>
-                <div class="k8s-logs-controls" id="k8s-logs-controls" style="display:none; align-items:center; width:100%;">
-                  <div style="font-size: 0.8rem; color: var(--text-muted); margin-right: 12px; white-space: nowrap; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="vertical-align:-3px; margin-right: 4px; flex-shrink: 0;"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span id="k8s-logs-tab-title">Logs</span>
-                  </div>
-                  <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                    <select id="k8s-logs-container" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; padding:4px 8px; font-size:0.8rem; min-width:140px;"><option value="">Container</option></select>
-                    <div class="k8s-logs-search" style="display:flex; align-items:center; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; padding:2px 8px; gap:6px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                      <input type="text" id="k8s-logs-search-input" placeholder="Search in logs..." style="background:transparent; border:none; color:var(--text-primary); font-size:0.85rem; width:140px; outline:none;" />
-                      <span class="k8s-logs-search-match" id="k8s-logs-search-count" style="font-size:0.75rem; color:var(--text-muted);">0/0</span>
-                    </div>
-                  </div>
-                  <div style="display:flex; align-items:center; gap:4px;">
-                    <button class="k8s-log-action-btn" id="k8s-logs-follow-btn" title="Auto Refresh (Follow) Logs">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-log-action-btn" id="k8s-logs-timestamps-btn" title="Show Timestamps">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-log-action-btn" id="k8s-logs-previous-btn" title="Show Previous (Terminated)">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-log-action-btn active" id="k8s-logs-wrap-btn" title="Wrap Lines">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h12a4 4 0 010 8H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 17l-3 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-log-action-btn" id="k8s-logs-download-btn" title="Download Logs">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button class="k8s-log-action-btn" id="k8s-btn-fetch-logs" title="Refresh Logs" style="margin-left:4px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="k8s-bottom-body">
-                <pre class="k8s-detail-content" id="k8s-detail-content">Loading...</pre>
-                
-                <!-- YAML Editor Container with Lens-like Toolbar -->
-                <div class="k8s-yaml-editor-container" id="k8s-yaml-editor-container" style="display:none;">
-                  <div class="k8s-yaml-toolbar">
-                    <div style="display:flex; align-items:center; gap:4px;">
-                      <button class="k8s-yaml-toolbar-btn" id="k8s-btn-apply-yaml" title="Save & Apply">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="k8s-yaml-subheader" id="k8s-yaml-subheader">
-                    Editing kubernetes <span id="k8s-yaml-kind">Pod</span> <a href="#" id="k8s-yaml-name-link">...</a> <span id="k8s-yaml-ns-text"></span>
-                  </div>
-                  <div class="k8s-yaml-editor" id="k8s-yaml-editor"></div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-      </div><!-- /page-k8s-manager -->
-
     </div><!-- /app-body -->
 
-    <!-- Scale Modal -->
-    <div class="modal-overlay" id="scale-modal" style="display:none;">
-      <div class="modal" style="max-width:360px;">
-        <div class="modal-header">
-          <h3 id="scale-modal-title">Scale Deployment</h3>
-          <button class="btn-icon" id="scale-modal-close">×</button>
-        </div>
-        <div class="modal-body" style="padding:16px;">
-          <label style="display:block;margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary);">Number of replicas:</label>
-          <input type="number" id="scale-modal-input" min="0" value="1" style="width:100%;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:0.9rem;" />
-        </div>
-        <div class="modal-footer" style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;">
-          <button class="btn btn-ghost btn-sm" id="scale-modal-cancel">Cancel</button>
-          <button class="btn btn-sm" id="scale-modal-confirm" style="background:var(--accent-primary);color:#fff;">Scale</button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Terminal Modal -->
     <div class="modal-overlay" id="terminal-modal" style="display:none;">
@@ -899,17 +688,7 @@
       </div>
     </div>
 
-    <!-- K8s Confirm Modal -->
-    <div class="k8s-confirm-overlay" id="k8s-confirm-overlay" style="display:none;">
-      <div class="k8s-confirm-box">
-        <div class="k8s-confirm-title">⚠️ Confirm Delete</div>
-        <div class="k8s-confirm-msg" id="k8s-confirm-msg"></div>
-        <div class="k8s-confirm-actions">
-          <button class="btn btn-ghost btn-sm" id="k8s-confirm-cancel">Cancel</button>
-          <button class="btn btn-sm k8s-confirm-delete-btn" id="k8s-confirm-ok">Delete</button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>

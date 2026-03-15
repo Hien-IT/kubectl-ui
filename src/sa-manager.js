@@ -1,7 +1,7 @@
 // ===== SA Manager Module =====
 // Handles ServiceAccount management: Create, Delete, Update RBAC, Export Kubeconfig
 
-import { activateK8sPage } from './k8s-manager.js';
+
 
 let saInvoke = null;
 
@@ -35,10 +35,7 @@ function initSidebar() {
       if (page === 'sa-manager') {
         reloadAllNamespaces();
       }
-      // Auto-load resources when entering K8s Manager (deferred for instant page render)
-      if (page === 'k8s-manager') {
-        setTimeout(() => activateK8sPage(), 0);
-      }
+
     });
   });
 }
