@@ -537,7 +537,7 @@ function renderTable(meta, items) {
   }
 
   // Body — map kubectl wide output columns to our display
-  tbody.innerHTML = items.map((cols, idx) => {
+  const newRows = items.map((cols, idx) => {
     const cells = orderedCols.map((colName, vi) => {
       let val = '';
       const origIdx = order[vi];
@@ -649,20 +649,46 @@ function renderTable(meta, items) {
       }
     }
     return `<tr class="k8s-row${isSelected ? ' selected' : ''}" data-idx="${idx}">${cells}</tr>`;
-  }).join('');
+  });
 
-  // Row click → open detail + highlight
-  tbody.querySelectorAll('.k8s-row').forEach(row => {
-    row.addEventListener('click', () => {
+  // Fast path: Row-by-row diffing to avoid full DOM rebuilds (which causes 1s UI freeze on large tables)
+  if (tbody.children.length === items.length && !tbody.querySelector('.k8s-empty')) {
+    for (let i = 0; i < items.length; i++) {
+      const existingRow = tbody.children[i];
+      if (existingRow.dataset.lastRowHtml !== newRows[i]) {
+        const temp = document.createElement('table');
+        temp.innerHTML = `<tbody>${newRows[i]}</tbody>`;
+        const newRow = temp.querySelector('tr');
+        newRow.dataset.lastRowHtml = newRows[i];
+        tbody.replaceChild(newRow, existingRow);
+      }
+    }
+  } else {
+    // Full rebuild only when length changes
+    tbody.innerHTML = newRows.join('');
+    for (let i = 0; i < tbody.children.length; i++) {
+      tbody.children[i].dataset.lastRowHtml = newRows[i];
+    }
+  }
+
+  // Row click event delegation
+  if (!tbody.hasAttribute('data-click-delegated')) {
+    tbody.setAttribute('data-click-delegated', 'true');
+    tbody.addEventListener('click', (e) => {
+      const row = e.target.closest('.k8s-row');
+      if (!row) return;
+      
       const idx = parseInt(row.dataset.idx);
       const item = cachedItems[idx];
       if (!item) return;
+      
       // Highlight selected row
       tbody.querySelectorAll('.k8s-row.selected').forEach(r => r.classList.remove('selected'));
       row.classList.add('selected');
+      
       openDetail(item);
     });
-  });
+  }
 }
 
 // ===== Column drag-to-reorder =====
