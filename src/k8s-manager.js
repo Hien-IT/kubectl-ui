@@ -82,8 +82,10 @@ export function reloadK8sOnContextSwitch() {
   }
 
   showLoading();
-  setTimeout(() => {
-    loadK8sNamespaces(true);
+  // By awaiting loadK8sNamespaces, we ensure the dropdown is correctly populated
+  // before fetchResources attempts to read currentNs or filter against bad namespaces
+  setTimeout(async () => {
+    await loadK8sNamespaces(true);
     fetchResources();
   }, 16);
 }
@@ -169,7 +171,8 @@ export async function loadK8sNamespaces(force = false) {
   const nsList = result.stdout.trim().split(/\s+/).filter(Boolean);
   const sel = document.getElementById('k8s-ns-filter');
   if (!sel) return;
-  const cur = sel.value;
+  // If forced reload (context switch), reset to All Namespaces, otherwise keep current
+  const cur = force ? '--all--' : sel.value;
   sel.innerHTML = '<option value="--all--">All Namespaces</option>';
   nsList.forEach(ns => {
     const opt = document.createElement('option');
@@ -177,6 +180,9 @@ export async function loadK8sNamespaces(force = false) {
     if (ns === cur) opt.selected = true;
     sel.appendChild(opt);
   });
+  if (force) {
+    sel.value = '--all--';
+  }
 }
 
 // ===== Show loading state =====
