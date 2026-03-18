@@ -182,22 +182,29 @@ export function createEnvFromRow(updatePreview) {
 
 // ===== imagePullSecrets Row =====
 
+let pullSecretCounter = 0;
+
 export function createPullSecretRow() {
+  const listId = `pullsecret-list-${++pullSecretCounter}`;
   const div = document.createElement('div');
   div.className = 'pull-secret-row env-from-row';
   div.innerHTML = `
     <div class="env-row-top">
       <span style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">🔐 Secret:</span>
-      <select class="pullsecret-ref-select" style="flex:1;">
-        <option value="">-- Select Secret --</option>
-      </select>
+      <input type="text" class="pullsecret-name-input" placeholder="nhập hoặc chọn secret" list="${listId}" style="flex:1;" />
+      <datalist id="${listId}" class="pullsecret-datalist"></datalist>
       <button class="btn-icon btn-remove-pullsecret" title="Remove">×</button>
     </div>
   `;
 
-  const refSelect = div.querySelector('.pullsecret-ref-select');
-  populateEnvRefDropdown(refSelect, 'secret');
+  populatePullSecretDatalist(div.querySelector(`#${listId}`));
   return div;
+}
+
+/** Populate a datalist with secret names for imagePullSecrets */
+export function populatePullSecretDatalist(datalistEl) {
+  const names = getSecretNames();
+  datalistEl.innerHTML = names.map(n => `<option value="${n}">`).join('');
 }
 
 // ===== Mount Row =====

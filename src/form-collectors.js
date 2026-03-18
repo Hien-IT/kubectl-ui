@@ -56,7 +56,7 @@ export function collectConfig() {
   // imagePullSecrets
   const imagePullSecrets = [];
   document.querySelectorAll('#image-pull-secrets-list .pull-secret-row').forEach(row => {
-    const name = row.querySelector('.pullsecret-ref-select')?.value || '';
+    const name = row.querySelector('.pullsecret-name-input')?.value?.trim() || '';
     if (name) imagePullSecrets.push(name);
   });
 
