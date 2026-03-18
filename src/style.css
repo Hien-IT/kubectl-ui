@@ -958,6 +958,92 @@ select {
   flex: 1;
 }
 
+/* ===== Pull Secret Custom Combobox ===== */
+.pullsecret-combo {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pullsecret-combo .pullsecret-name-input {
+  flex: 1;
+  padding-right: 32px;
+}
+
+.pullsecret-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+  line-height: 1;
+}
+
+.pullsecret-toggle:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pullsecret-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 50;
+  display: none;
+  animation: dropdownOpen 0.12s ease-out;
+}
+
+.pullsecret-dropdown.open {
+  display: block;
+}
+
+@keyframes dropdownOpen {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pullsecret-option {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pullsecret-option:last-child {
+  border-bottom: none;
+}
+
+.pullsecret-option:hover,
+.pullsecret-option.active {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--text-primary);
+}
+
+.pullsecret-empty {
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
 /* ===== Annotation Preset Chips ===== */
 .btn-chip {
   padding: 4px 10px;

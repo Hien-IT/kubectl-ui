@@ -182,29 +182,123 @@ export function createEnvFromRow(updatePreview) {
 
 // ===== imagePullSecrets Row =====
 
-let pullSecretCounter = 0;
-
 export function createPullSecretRow() {
-  const listId = `pullsecret-list-${++pullSecretCounter}`;
   const div = document.createElement('div');
   div.className = 'pull-secret-row env-from-row';
   div.innerHTML = `
     <div class="env-row-top">
       <span style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">🔐 Secret:</span>
-      <input type="text" class="pullsecret-name-input" placeholder="nhập hoặc chọn secret" list="${listId}" style="flex:1;" />
-      <datalist id="${listId}" class="pullsecret-datalist"></datalist>
+      <div class="pullsecret-combo" style="flex:1;position:relative;">
+        <input type="text" class="pullsecret-name-input" placeholder="nhập hoặc chọn secret" autocomplete="off" />
+        <button type="button" class="pullsecret-toggle" tabindex="-1">▾</button>
+        <div class="pullsecret-dropdown"></div>
+      </div>
       <button class="btn-icon btn-remove-pullsecret" title="Remove">×</button>
     </div>
   `;
 
-  populatePullSecretDatalist(div.querySelector(`#${listId}`));
+  initPullSecretCombo(div);
   return div;
 }
 
-/** Populate a datalist with secret names for imagePullSecrets */
-export function populatePullSecretDatalist(datalistEl) {
-  const names = getSecretNames();
-  datalistEl.innerHTML = names.map(n => `<option value="${n}">`).join('');
+/** Initialize the custom combobox behavior for a pull secret row */
+function initPullSecretCombo(rowEl) {
+  const input = rowEl.querySelector('.pullsecret-name-input');
+  const toggle = rowEl.querySelector('.pullsecret-toggle');
+  const dropdown = rowEl.querySelector('.pullsecret-dropdown');
+  let activeIndex = -1;
+
+  function renderDropdown(filter = '') {
+    const names = getSecretNames();
+    const filtered = filter
+      ? names.filter(n => n.toLowerCase().includes(filter.toLowerCase()))
+      : names;
+
+    if (filtered.length === 0) {
+      dropdown.innerHTML = '<div class="pullsecret-empty">Không có secret nào</div>';
+    } else {
+      dropdown.innerHTML = filtered.map((n, i) =>
+        `<div class="pullsecret-option${i === activeIndex ? ' active' : ''}" data-value="${n}">${n}</div>`
+      ).join('');
+    }
+  }
+
+  function showDropdown() {
+    activeIndex = -1;
+    renderDropdown(input.value);
+    dropdown.classList.add('open');
+  }
+
+  function hideDropdown() {
+    dropdown.classList.remove('open');
+    activeIndex = -1;
+  }
+
+  function selectOption(val) {
+    input.value = val;
+    hideDropdown();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  input.addEventListener('focus', showDropdown);
+  input.addEventListener('input', () => {
+    activeIndex = -1;
+    renderDropdown(input.value);
+    dropdown.classList.add('open');
+  });
+
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (dropdown.classList.contains('open')) {
+      hideDropdown();
+    } else {
+      input.focus();
+      showDropdown();
+    }
+  });
+
+  dropdown.addEventListener('mousedown', (e) => {
+    e.preventDefault(); // prevent input blur
+    const opt = e.target.closest('.pullsecret-option');
+    if (opt) selectOption(opt.dataset.value);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    const options = dropdown.querySelectorAll('.pullsecret-option');
+    if (!dropdown.classList.contains('open') || options.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIndex = Math.min(activeIndex + 1, options.length - 1);
+      updateActive(options);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIndex = Math.max(activeIndex - 1, 0);
+      updateActive(options);
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      selectOption(options[activeIndex].dataset.value);
+    } else if (e.key === 'Escape') {
+      hideDropdown();
+    }
+  });
+
+  function updateActive(options) {
+    options.forEach((opt, i) => opt.classList.toggle('active', i === activeIndex));
+    if (activeIndex >= 0 && options[activeIndex]) {
+      options[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  input.addEventListener('blur', () => {
+    // small delay to allow click on dropdown
+    setTimeout(hideDropdown, 150);
+  });
+}
+
+/** Refresh all pull secret dropdowns */
+export function refreshPullSecretDropdowns() {
+  // No-op needed — dropdowns render fresh on open from getSecretNames()
 }
 
 // ===== Mount Row =====

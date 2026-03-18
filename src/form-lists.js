@@ -8,7 +8,7 @@ import {
   createMountRow, createEnvRow, createEnvFromRow, createPullSecretRow,
   createPvcItem, createConfigMapItem, createSecretItem, createServiceItem,
   createSvcPortRow,
-  populateMountDropdown, populateEnvRefDropdown, populatePullSecretDatalist,
+  populateMountDropdown, populateEnvRefDropdown,
 } from './form-creators.js';
 
 // ===== Refresh Dropdowns =====
@@ -40,11 +40,6 @@ export function refreshAllEnvDropdowns() {
     if (type && refSelect) {
       populateEnvRefDropdown(refSelect, type);
     }
-  });
-  // Also refresh imagePullSecrets datalists
-  document.querySelectorAll('#image-pull-secrets-list .pull-secret-row').forEach(row => {
-    const datalist = row.querySelector('.pullsecret-datalist');
-    if (datalist) populatePullSecretDatalist(datalist);
   });
 }
 
