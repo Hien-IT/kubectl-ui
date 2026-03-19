@@ -249,7 +249,18 @@ export function initTlsToggle(updatePreview) {
     document.getElementById('tls-fields').style.display = e.target.checked ? 'block' : 'none';
     updatePreview();
   });
-  document.getElementById('enable-init-permissions').addEventListener('change', () => updatePreview());
+  document.getElementById('enable-init-permissions').addEventListener('change', (e) => {
+    const warning = document.getElementById('init-container-warning');
+    if (e.target.checked) {
+      // Show warning and auto-uncheck conflicting security options
+      if (warning) warning.style.display = 'block';
+      document.getElementById('sc-run-as-nonroot').checked = false;
+      document.getElementById('sc-readonly-root').checked = false;
+    } else {
+      if (warning) warning.style.display = 'none';
+    }
+    updatePreview();
+  });
 
   // Probe toggles
   function initProbeToggle(prefix) {

@@ -342,6 +342,9 @@
                 <span style="font-size:0.85rem;font-weight:500;color:var(--text-secondary);">Init Container — Fix PVC Permissions</span>
                 <span class="hint">(dùng runAsUser/runAsGroup từ Security Context)</span>
               </div>
+              <div id="init-container-warning" class="hint" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:6px;color:#f59e0b;font-size:0.8rem;line-height:1.5;">
+                ⚠️ Init Container chạy với quyền root — nên <strong>bỏ tick</strong> <code style="background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;">runAsNonRoot</code> và <code style="background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;">readOnlyRootFilesystem</code> trong Security Context để tránh lỗi policy.
+              </div>
             </div>
           </div>
 

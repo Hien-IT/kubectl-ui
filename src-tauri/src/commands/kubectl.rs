@@ -55,7 +55,54 @@ pub fn save_and_apply_files(files: HashMap<String, String>, namespace: Option<St
         }
     }
 
-    // Apply the entire directory
+    // If namespace.yaml exists, apply it first and wait for readiness
+    let ns_file = tmp_dir.join("namespace.yaml");
+    let mut all_stdout = String::new();
+    let mut all_stderr = String::new();
+
+    if ns_file.exists() {
+        let mut ns_cmd = Command::new("kubectl");
+        ns_cmd.arg("apply").arg("-f").arg(&ns_file);
+        let ns_result = run_command(&mut ns_cmd);
+        all_stdout.push_str(&ns_result.stdout);
+        all_stderr.push_str(&ns_result.stderr);
+
+        if !ns_result.success {
+            return CmdResult {
+                success: false,
+                stdout: all_stdout,
+                stderr: all_stderr,
+            };
+        }
+
+        // Wait for the namespace to be active before applying other resources
+        if let Some(ref ns) = namespace {
+            if !ns.is_empty() {
+                let mut wait_cmd = Command::new("kubectl");
+                wait_cmd.args(["wait", "--for=jsonpath={.status.phase}=Active",
+                    &format!("namespace/{}", ns), "--timeout=10s"]);
+                let _ = run_command(&mut wait_cmd);
+            }
+        }
+
+        // Remove namespace.yaml so it won't be re-applied
+        fs::remove_file(&ns_file).ok();
+    }
+
+    // Check if there are remaining files to apply
+    let remaining: Vec<_> = fs::read_dir(&tmp_dir)
+        .map(|entries| entries.filter_map(|e| e.ok()).collect())
+        .unwrap_or_default();
+
+    if remaining.is_empty() {
+        return CmdResult {
+            success: true,
+            stdout: all_stdout,
+            stderr: all_stderr,
+        };
+    }
+
+    // Apply the remaining files
     let mut cmd = Command::new("kubectl");
     cmd.arg("apply").arg("-f").arg(&tmp_dir);
     
@@ -65,7 +112,15 @@ pub fn save_and_apply_files(files: HashMap<String, String>, namespace: Option<St
         }
     }
 
-    run_command(&mut cmd)
+    let rest_result = run_command(&mut cmd);
+    all_stdout.push_str(&rest_result.stdout);
+    all_stderr.push_str(&rest_result.stderr);
+
+    CmdResult {
+        success: rest_result.success,
+        stdout: all_stdout,
+        stderr: all_stderr,
+    }
 }
 
 /// Get list of kubectl contexts
