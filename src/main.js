@@ -12,6 +12,7 @@ import { initActions } from './actions.js';
 import { updatePreview } from './preview.js';
 import { initModal } from './modal.js';
 import { initSAManager } from './sa-manager.js';
+import { initHistory } from './history.js';
 
 
 // ===== Initialize =====
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initNamespaceDropdown(updatePreview);
   initContextSwitcher();
   initSAManager(getInvoke());
+  initHistory();
 
 
   // Initial preview render

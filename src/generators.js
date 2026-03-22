@@ -474,7 +474,8 @@ spec:
  */
 function formatLabels(labels, indent) {
   const spaces = ' '.repeat(indent);
-  return Object.entries(labels)
+  const allLabels = { ...labels, 'app.kubernetes.io/managed-by': 'kubectl-ui' };
+  return Object.entries(allLabels)
     .map(([key, value]) => `${spaces}${key}: ${value}`)
     .join('\n');
 }

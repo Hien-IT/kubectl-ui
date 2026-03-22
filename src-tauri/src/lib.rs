@@ -28,6 +28,10 @@ pub fn run() {
             commands::files::save_yaml_to_dir,
             commands::files::save_file,
             commands::files::get_home_dir,
+            commands::history::save_history,
+            commands::history::get_history,
+            commands::history::delete_history,
+            commands::history::clear_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

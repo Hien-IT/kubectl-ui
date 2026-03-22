@@ -5,6 +5,7 @@ import { showToast } from './utils.js';
 import { showModal, setModalResult, showConfirmModal } from './modal.js';
 import { getNamespace } from './namespace.js';
 import { getGeneratedFiles, getCurrentPreviewTab, getCurrentYaml } from './preview.js';
+import { loadResources } from './history.js';
 
 /** Apply all generated files via kubectl */
 async function applyAllFiles() {
@@ -32,6 +33,8 @@ async function applyAllFiles() {
     const result = await invoke('save_and_apply_files', { files: generatedFiles, namespace });
     setModalResult(result, `kubectl apply -f ./manifests/ -n ${namespace}`);
     if (result.success) showToast(`Applied ${files.length} resources successfully!`, 'success');
+    // Save history
+    saveApplyHistory(invoke, namespace, files.map(([n]) => n), files.map(([,c]) => c).join('\n---\n'), result);
   } catch (e) {
     setModalResult({ success: false, stdout: '', stderr: `Error: ${e}` }, 'kubectl apply');
   }
@@ -60,8 +63,30 @@ async function applyCurrentFile() {
     const result = await invoke('apply_yaml', { yaml, namespace });
     setModalResult(result, `kubectl apply -f ${fileName} -n ${namespace}`);
     if (result.success) showToast('Applied successfully!', 'success');
+    // Save history
+    saveApplyHistory(invoke, namespace, [fileName], yaml, result);
   } catch (e) {
     setModalResult({ success: false, stdout: '', stderr: `Error: ${e}` }, 'kubectl apply');
+  }
+}
+
+/** Save apply event to history */
+async function saveApplyHistory(invoke, namespace, fileNames, yaml, result) {
+  try {
+    const context = document.getElementById('kubectl-context').value || 'unknown';
+    await invoke('save_history', {
+      timestamp: new Date().toISOString(),
+      context,
+      namespace: namespace || 'default',
+      files: fileNames,
+      yaml,
+      success: result.success,
+      output: [result.stdout, result.stderr].filter(Boolean).join('\n'),
+    });
+    // Refresh history page if loaded
+    loadResources();
+  } catch (e) {
+    console.warn('Failed to save history:', e);
   }
 }
 
