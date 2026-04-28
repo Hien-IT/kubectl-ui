@@ -229,6 +229,10 @@ function initSAButtons() {
 
     // Namespace role bindings
     await applyNsBindings(sa, ns, 'sa-create-ns-list');
+
+    // Cluster-wide permissions
+    await applyClusterBindings(sa, ns, 'sa-create');
+
     showSAToast('Hoàn thành!', 'success');
   });
 
@@ -265,6 +269,10 @@ function initSAButtons() {
 
     // Apply new bindings
     await applyNsBindings(sa, ns, 'sa-update-ns-list');
+
+    // Cluster-wide permissions
+    await applyClusterBindings(sa, ns, 'sa-update');
+
     showSAToast('RBAC updated!', 'success');
   });
 
@@ -355,6 +363,79 @@ subjects:
     await kubectl(['apply', '-f', '-'], metricsRbYaml);
 
     showSAToast(`Gán ${role} + metrics-reader cho ${bindNs}`, 'success');
+  }
+}
+
+// ===== Apply Cluster-wide Bindings =====
+async function applyClusterBindings(sa, saNamespace, prefix) {
+  const viewNodes = document.getElementById(`${prefix}-cluster-nodes`)?.checked;
+  const execPod = document.getElementById(`${prefix}-cluster-exec`)?.checked;
+  const logsPod = document.getElementById(`${prefix}-cluster-logs`)?.checked;
+
+  // Node Reader ClusterRole
+  if (viewNodes) {
+    const clusterRoleYaml = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${sa}-node-reader
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]`;
+    await kubectl(['apply', '-f', '-'], clusterRoleYaml);
+
+    const crbYaml = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${sa}-node-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ${sa}-node-reader
+subjects:
+- kind: ServiceAccount
+  name: ${sa}
+  namespace: ${saNamespace}`;
+    await kubectl(['apply', '-f', '-'], crbYaml);
+    showSAToast('Đã gán quyền xem Node', 'success');
+  }
+
+  // Pod Exec + Logs ClusterRole
+  if (execPod || logsPod) {
+    const verbs = [];
+    if (execPod) verbs.push('create');
+    if (logsPod) verbs.push('get');
+
+    const clusterRoleYaml = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${sa}-pod-access
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]`;
+    await kubectl(['apply', '-f', '-'], clusterRoleYaml);
+
+    const crbYaml = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${sa}-pod-access
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ${sa}-pod-access
+subjects:
+- kind: ServiceAccount
+  name: ${sa}
+  namespace: ${saNamespace}`;
+    await kubectl(['apply', '-f', '-'], crbYaml);
+    showSAToast('Đã gán quyền Shell/Logs Pod', 'success');
   }
 }
 

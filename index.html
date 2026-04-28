@@ -594,6 +594,25 @@
             <h3 class="form-subtitle">Gán quyền Namespace</h3>
             <div class="sa-ns-list" id="sa-create-ns-list"></div>
             <button class="btn btn-ghost btn-sm" id="sa-btn-add-ns-binding">+ Add Namespace Binding</button>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Quyền Cluster-wide</h3>
+            <div class="form-group">
+              <label>Cluster Permissions</label>
+              <div class="sa-cluster-perms">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sa-create-cluster-nodes" />
+                  <span>Xem danh sách Node</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sa-create-cluster-exec" />
+                  <span>Shell vào Pod (exec)</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sa-create-cluster-logs" />
+                  <span>Xem Pod Logs</span>
+                </label>
+              </div>
+            </div>
             <div style="margin-top:16px;">
               <button class="btn btn-success" id="sa-btn-create">🚀 Tạo ServiceAccount</button>
             </div>
@@ -633,6 +652,25 @@
             <h3 class="form-subtitle">Gán quyền mới</h3>
             <div class="sa-ns-list" id="sa-update-ns-list"></div>
             <button class="btn btn-ghost btn-sm" id="sa-btn-add-ns-binding-update">+ Add Namespace Binding</button>
+            <div class="form-divider"></div>
+            <h3 class="form-subtitle">Quyền Cluster-wide</h3>
+            <div class="form-group">
+              <label>Cluster Permissions</label>
+              <div class="sa-cluster-perms">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sa-update-cluster-nodes" />
+                  <span>Xem danh sách Node</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sa-update-cluster-exec" />
+                  <span>Shell vào Pod (exec)</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sa-update-cluster-logs" />
+                  <span>Xem Pod Logs</span>
+                </label>
+              </div>
+            </div>
             <div style="margin-top:16px;">
               <button class="btn btn-primary" id="sa-btn-update">🔄 Update RBAC</button>
             </div>
