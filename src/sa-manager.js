@@ -187,6 +187,101 @@ async function loadServiceAccounts(namespace, selectId) {
   });
 }
 
+// ===== Load existing cluster bindings for an SA =====
+async function loadExistingClusterBindings(sa, namespace) {
+  const prefix = 'sa-update';
+
+  // Reset checkboxes first
+  document.getElementById(`${prefix}-cluster-nodes`).checked = false;
+  document.getElementById(`${prefix}-cluster-exec`).checked = false;
+  document.getElementById(`${prefix}-cluster-logs`).checked = false;
+
+  // Check node-reader ClusterRoleBinding
+  const nodeReaderResult = await kubectlSilent([
+    'get', 'clusterrolebinding', `${sa}-node-reader`, '-o', 'json'
+  ]);
+  if (nodeReaderResult?.success) {
+    document.getElementById(`${prefix}-cluster-nodes`).checked = true;
+  }
+
+  // Check pod-access ClusterRoleBinding
+  const podAccessResult = await kubectlSilent([
+    'get', 'clusterrolebinding', `${sa}-pod-access`, '-o', 'json'
+  ]);
+  if (podAccessResult?.success) {
+    // Get the ClusterRole to determine if exec/logs is granted
+    const crResult = await kubectlSilent([
+      'get', 'clusterrole', `${sa}-pod-access`, '-o', 'json'
+    ]);
+    if (crResult?.success) {
+      try {
+        const cr = JSON.parse(crResult.stdout);
+        const rules = cr.rules || [];
+        for (const rule of rules) {
+          if (rule.resources?.includes('pods/exec')) {
+            document.getElementById(`${prefix}-cluster-exec`).checked = true;
+          }
+          if (rule.resources?.includes('pods/log')) {
+            document.getElementById(`${prefix}-cluster-logs`).checked = true;
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Check if kube-system admin binding exists (for auto-added kube-system)
+  const kubeSystemResult = await kubectlSilent([
+    'get', 'rolebinding', `${sa}-kube-system-admin`, '-n', 'kube-system', '-o', 'json'
+  ]);
+  if (kubeSystemResult?.success) {
+    // kube-system admin exists, it's implied by exec checkbox
+    // No additional UI change needed
+  }
+}
+
+// ===== Load existing namespace bindings for an SA =====
+async function loadExistingNsBindings(sa, namespace) {
+  const listEl = document.getElementById('sa-update-ns-list');
+  if (!listEl) return;
+
+  // Clear existing rows
+  listEl.innerHTML = '';
+
+  // Get all ClusterRoleBindings that reference this SA in other namespaces
+  const crbResult = await kubectlSilent([
+    'get', 'clusterrolebindings', '-o', 'json'
+  ]);
+  if (!crbResult?.success) return;
+
+  try {
+    const crbs = JSON.parse(crbResult.stdout);
+    const nsSet = new Set();
+
+    for (const crb of crbs.items || []) {
+      const subjects = crb.subjects || [];
+      const hasSA = subjects.some(
+        s => s.kind === 'ServiceAccount' && s.name === sa && s.namespace === namespace
+      );
+      if (hasSA) {
+        // Get role name from roleRef
+        const roleName = crb.roleRef?.name;
+        if (roleName && crb.metadata?.namespace) {
+          nsSet.add(`${crb.metadata.namespace}:${roleName}`);
+        }
+      }
+    }
+
+    // Add rows for found bindings
+    for (const binding of nsSet) {
+      const [ns, role] = binding.split(':');
+      const row = createNsBindingRow();
+      row.querySelector('.sa-bind-ns').value = ns;
+      row.querySelector('.sa-bind-role').value = role || 'view';
+      listEl.appendChild(row);
+    }
+  } catch {}
+}
+
 // ===== Button Handlers =====
 function initSAButtons() {
   // Add NS binding buttons
@@ -201,8 +296,23 @@ function initSAButtons() {
   document.getElementById('sa-delete-ns')?.addEventListener('change', (e) => {
     loadServiceAccounts(e.target.value, 'sa-delete-name');
   });
-  document.getElementById('sa-update-ns')?.addEventListener('change', (e) => {
-    loadServiceAccounts(e.target.value, 'sa-update-name');
+  document.getElementById('sa-update-ns')?.addEventListener('change', async (e) => {
+    const ns = e.target.value;
+    await loadServiceAccounts(ns, 'sa-update-name');
+    // Reset bindings when namespace changes
+    document.getElementById('sa-update-cluster-nodes').checked = false;
+    document.getElementById('sa-update-cluster-exec').checked = false;
+    document.getElementById('sa-update-cluster-logs').checked = false;
+    document.getElementById('sa-update-ns-list').innerHTML = '';
+  });
+
+  // When SA is selected, load its existing bindings
+  document.getElementById('sa-update-name')?.addEventListener('change', async (e) => {
+    const sa = e.target.value;
+    const ns = document.getElementById('sa-update-ns').value;
+    if (!sa || !ns) return;
+    await loadExistingClusterBindings(sa, ns);
+    await loadExistingNsBindings(sa, ns);
   });
   document.getElementById('sa-export-ns')?.addEventListener('change', (e) => {
     loadServiceAccounts(e.target.value, 'sa-export-name');
@@ -436,6 +546,24 @@ subjects:
   namespace: ${saNamespace}`;
     await kubectl(['apply', '-f', '-'], crbYaml);
     showSAToast('Đã gán quyền Shell/Logs Pod', 'success');
+
+    // Auto-add kube-system with admin when Exec + Logs is enabled
+    // This is needed because system/debug pods run in kube-system
+    const kubeSystemRbYaml = `apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${sa}-kube-system-admin
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:
+- kind: ServiceAccount
+  name: ${sa}
+  namespace: ${saNamespace}`;
+    await kubectl(['apply', '-f', '-'], kubeSystemRbYaml);
+    showSAToast('Đã tự động gán admin cho kube-system', 'success');
   }
 }
 
