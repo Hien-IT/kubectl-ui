@@ -13,6 +13,7 @@ import { updatePreview } from './preview.js';
 import { initModal } from './modal.js';
 import { initSAManager } from './sa-manager.js';
 import { initHistory } from './history.js';
+import { initComposeConverter } from './compose-converter.js';
 
 
 // ===== Initialize =====
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initContextSwitcher();
   initSAManager(getInvoke());
   initHistory();
+  initComposeConverter();
 
 
   // Initial preview render
