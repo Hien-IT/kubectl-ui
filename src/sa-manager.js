@@ -138,6 +138,14 @@ function createNsBindingRow() {
     </select>
     <button class="btn-icon btn-remove-kv" title="Remove">×</button>
   `;
+  
+  // Attach remove handler
+  div.querySelector('.btn-remove-kv').addEventListener('click', () => {
+    div.style.opacity = '0';
+    div.style.transform = 'translateX(-10px)';
+    setTimeout(() => div.remove(), 150);
+  });
+
   return div;
 }
 
@@ -247,26 +255,26 @@ async function loadExistingNsBindings(sa, namespace) {
   // Clear existing rows
   listEl.innerHTML = '';
 
-  // Get all ClusterRoleBindings that reference this SA in other namespaces
-  const crbResult = await kubectlSilent([
-    'get', 'clusterrolebindings', '-o', 'json'
+  // Get all RoleBindings that reference this SA in all namespaces
+  const rbResult = await kubectlSilent([
+    'get', 'rolebindings', '-A', '-o', 'json'
   ]);
-  if (!crbResult?.success) return;
+  if (!rbResult?.success) return;
 
   try {
-    const crbs = JSON.parse(crbResult.stdout);
+    const rbs = JSON.parse(rbResult.stdout);
     const nsSet = new Set();
 
-    for (const crb of crbs.items || []) {
-      const subjects = crb.subjects || [];
+    for (const rb of rbs.items || []) {
+      const subjects = rb.subjects || [];
       const hasSA = subjects.some(
         s => s.kind === 'ServiceAccount' && s.name === sa && s.namespace === namespace
       );
       if (hasSA) {
         // Get role name from roleRef
-        const roleName = crb.roleRef?.name;
-        if (roleName && crb.metadata?.namespace) {
-          nsSet.add(`${crb.metadata.namespace}:${roleName}`);
+        const roleName = rb.roleRef?.name;
+        if (roleName && roleName !== 'metrics-reader' && rb.metadata?.namespace) {
+          nsSet.add(`${rb.metadata.namespace}:${roleName}`);
         }
       }
     }
