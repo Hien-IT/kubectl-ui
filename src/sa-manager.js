@@ -271,6 +271,10 @@ async function loadExistingNsBindings(sa, namespace) {
         s => s.kind === 'ServiceAccount' && s.name === sa && s.namespace === namespace
       );
       if (hasSA) {
+        // Skip auto-created kube-system admin rolebinding
+        if (rb.metadata?.namespace === 'kube-system' && rb.metadata?.name === `${sa}-kube-system-admin`) {
+          continue;
+        }
         // Get role name from roleRef
         const roleName = rb.roleRef?.name;
         if (roleName && roleName !== 'metrics-reader' && rb.metadata?.namespace) {
@@ -554,24 +558,6 @@ subjects:
   namespace: ${saNamespace}`;
     await kubectl(['apply', '-f', '-'], crbYaml);
     showSAToast('Đã gán quyền Shell/Logs Pod', 'success');
-
-    // Auto-add kube-system with admin when Exec + Logs is enabled
-    // This is needed because system/debug pods run in kube-system
-    const kubeSystemRbYaml = `apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: ${sa}-kube-system-admin
-  namespace: kube-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: admin
-subjects:
-- kind: ServiceAccount
-  name: ${sa}
-  namespace: ${saNamespace}`;
-    await kubectl(['apply', '-f', '-'], kubeSystemRbYaml);
-    showSAToast('Đã tự động gán admin cho kube-system', 'success');
   }
 }
 
